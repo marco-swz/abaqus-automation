@@ -3,7 +3,7 @@ import subprocess
 
 def exec_command(command: str) -> subprocess.CompletedProcess[bytes]:
     """Executes the provided terminal command."""
-    output = subprocess.run(command.split(" "), capture_output=True)
+    output = subprocess.run(command.split(" "), capture_output=True, shell=True)
     return output
 
 def read_file(path: str) -> str:
@@ -29,7 +29,8 @@ def replace_all(text: str, replace: Dict[str, str|Callable[[], str]]) -> str:
     return text
 
 def main():
-    pass
+    output = exec_command('abaqus cae noGUI=journal/test.py')
+    print(output)
 
 if __name__ == '__main__':
     main()
