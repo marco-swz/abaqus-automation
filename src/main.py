@@ -1,7 +1,7 @@
 from typing import Dict, Callable
 import subprocess
 from dataclasses import dataclass
-
+import re
 
 @dataclass
 class SimSettings:
@@ -40,17 +40,40 @@ def replace_all(text: str, replace: Dict[str, str|Callable[[], str]]) -> str:
         text = text.replace(old_str, new_str)
     return text
 
-def create_job_command(settings: SimSettings) -> str:
-    return f"mdb.Job(name='{settings.job_name}', model='Model-1', description='', type=ANALYSIS, 
-        atTime=None, waitMinutes=0, waitHours=0, queue=None, memory={settings.mem_size_mb}, 
-        memoryUnits=MEGA_BYTES, getMemoryFromAnalysis=True, 
-        explicitPrecision=SINGLE, nodalOutputPrecision=SINGLE, echoPrint=OFF, 
-        modelPrint=OFF, contactPrint=OFF, historyPrint=OFF, userSubroutine='', 
-        scratch='{settings.scratch_path}', resultsFormat=ODB, numThreadsPerMpiProcess=1, 
-        multiprocessingMode=DEFAULT, numCpus={settings.num_cpus}, numDomains=4, numGPUs={settings.num_gpus})"
+def create_job_control(settings: SimSettings) -> str:
+    return f"""
+        job = mdb.Job(
+            name='{settings.job_name}', 
+            model='Model-1', 
+            description='', 
+            type=ANALYSIS, 
+            atTime=None, 
+            waitMinutes=0, 
+            waitHours=0, 
+            queue=None, 
+            memory={settings.mem_size_mb}, 
+            memoryUnits=MEGA_BYTES, 
+            getMemoryFromAnalysis=True, 
+            explicitPrecision=SINGLE, 
+            nodalOutputPrecision=SINGLE, 
+            echoPrint=OFF, 
+            modelPrint=OFF, 
+            contactPrint=OFF, 
+            historyPrint=OFF, 
+            userSubroutine='', 
+            scratch='{settings.scratch_path}', 
+            resultsFormat=ODB, 
+            numThreadsPerMpiProcess=1, 
+            multiprocessingMode=DEFAULT, 
+            numCpus={settings.num_cpus}, 
+            numDomains=4, 
+            numGPUs={settings.num_gpus}
+        )
 
-def create_job_submit(settings: SimSettings) -> str:
-    return f"mdb.jobs['{settings.job_name}'].submit(consistencyChecking=OFF)"
+        job.submit(consistencyChecking=OFF)
+        job.waitForCompletion()
+    """
+    # TODO(marco): Add result conversion
 
 def run_sim(settings: SimSettings):
     # TODO(marco): Set correct file paths in script
@@ -59,15 +82,21 @@ def run_sim(settings: SimSettings):
     script_path = f'scripts/{settings.job_name}.py'
      
     script = read_file(template_path)
-    re.sub("mdb\.Job\((.|\n)*\)", create_job_command(settings), script)
-    re.sub("mdb\.jobs\[.*submit\(.*\)", create_job_submit(settings), script)
+    # Remove existing job control
+    re.sub(r"mdb\.jobs\[.*submit\(.*\)", '', script)
+    re.sub(r"mdb\.jobs\[.*waitForCompletion\(.*\)", '', script)
+    re.sub(r"mdb\.Job\((.|\n)*\)", '', script)
+    # Append custom job control
+    script += create_job_control(settings)
     write_file(script_path, script)
 
+    # Run script
     output = exec_command(f'abaqus cae noGUI={script_path}')
     if output.returncode != 0:
-        print("Could not execute journal file!")
+        print("Abaqus script execution failed!")
         print(output.stderr)
-        return
+
+    print("Simulation done")
 
 def main() -> None:
     settings = SimSettings(
@@ -80,7 +109,6 @@ def main() -> None:
         scratch_path='',
     )
     run_sim(settings)
-
 
 if __name__ == '__main__':
     main()
