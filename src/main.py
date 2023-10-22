@@ -42,36 +42,36 @@ def replace_all(text: str, replace: Dict[str, str|Callable[[], str]]) -> str:
 
 def create_job_control(settings: SimSettings) -> str:
     return f"""
-        job = mdb.Job(
-            name='{settings.job_name}', 
-            model='Model-1', 
-            description='', 
-            type=ANALYSIS, 
-            atTime=None, 
-            waitMinutes=0, 
-            waitHours=0, 
-            queue=None, 
-            memory={settings.mem_size_mb}, 
-            memoryUnits=MEGA_BYTES, 
-            getMemoryFromAnalysis=True, 
-            explicitPrecision=SINGLE, 
-            nodalOutputPrecision=SINGLE, 
-            echoPrint=OFF, 
-            modelPrint=OFF, 
-            contactPrint=OFF, 
-            historyPrint=OFF, 
-            userSubroutine='', 
-            scratch='{settings.scratch_path}', 
-            resultsFormat=ODB, 
-            numThreadsPerMpiProcess=1, 
-            multiprocessingMode=DEFAULT, 
-            numCpus={settings.num_cpus}, 
-            numDomains=4, 
-            numGPUs={settings.num_gpus}
-        )
+job = mdb.Job(
+    name='{settings.job_name}', 
+    model='Model-1', 
+    description='', 
+    type=ANALYSIS, 
+    atTime=None, 
+    waitMinutes=0, 
+    waitHours=0, 
+    queue=None, 
+    memory={settings.mem_size_mb}, 
+    memoryUnits=MEGA_BYTES, 
+    getMemoryFromAnalysis=True, 
+    explicitPrecision=SINGLE, 
+    nodalOutputPrecision=SINGLE, 
+    echoPrint=OFF, 
+    modelPrint=OFF, 
+    contactPrint=OFF, 
+    historyPrint=OFF, 
+    userSubroutine='', 
+    scratch='{settings.scratch_path}', 
+    resultsFormat=ODB, 
+    numThreadsPerMpiProcess=1, 
+    multiprocessingMode=DEFAULT, 
+    numCpus={settings.num_cpus}, 
+    numDomains=4, 
+    numGPUs={settings.num_gpus}
+)
 
-        job.submit(consistencyChecking=OFF)
-        job.waitForCompletion()
+job.submit(consistencyChecking=OFF)
+job.waitForCompletion()
     """
     # TODO(marco): Add result conversion
 
@@ -83,9 +83,10 @@ def run_sim(settings: SimSettings):
      
     script = read_file(template_path)
     # Remove existing job control
-    re.sub(r"mdb\.jobs\[.*submit\(.*\)", '', script)
-    re.sub(r"mdb\.jobs\[.*waitForCompletion\(.*\)", '', script)
-    re.sub(r"mdb\.Job\((.|\n)*\)", '', script)
+    script = re.sub(r"mdb\.jobs\[.*submit\(.*\)", '# DELETED', script)
+    script = re.sub(r"mdb\.jobs\[.*waitForCompletion\(.*\)", '# DELETED', script)
+    script = re.sub(r"mdb\.jobs\[.*writeInput\(.*\)", '# DELETED', script)
+    script = re.sub(r"(?s)mdb\.Job\(.*?\)", '# DELETED', script)
     # Append custom job control
     script += create_job_control(settings)
     write_file(script_path, script)
@@ -101,11 +102,11 @@ def run_sim(settings: SimSettings):
 def main() -> None:
     settings = SimSettings(
         job_name='test',
-        script_path='journal/test.py',
+        script_path='script/test.py',
         input_path='test.inp',
-        num_cpus=4,
+        num_cpus=1,
         num_gpus=0,
-        mem_size_mb=4,
+        mem_size_mb=4000,
         scratch_path='',
     )
     run_sim(settings)
