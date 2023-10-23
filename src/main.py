@@ -66,7 +66,7 @@ job = mdb.Job(
     numThreadsPerMpiProcess=1, 
     multiprocessingMode=DEFAULT, 
     numCpus={settings.num_cpus}, 
-    numDomains=4, 
+    numDomains=1, 
     numGPUs={settings.num_gpus}
 )
 
@@ -86,6 +86,9 @@ def run_sim(settings: SimSettings):
     script = re.sub(r"mdb\.jobs\[.*submit\(.*\)", '# DELETED', script)
     script = re.sub(r"mdb\.jobs\[.*waitForCompletion\(.*\)", '# DELETED', script)
     script = re.sub(r"mdb\.jobs\[.*writeInput\(.*\)", '# DELETED', script)
+    script = re.sub(r"session\.viewports\[.*(\n\s.*)*", '# DELETED', script)
+    script = re.sub(r".*session\.openOdb.*", '# DELETED', script)
+    script = re.sub(r"session\.odbs.*", '# DELETED', script)
     script = re.sub(r"(?s)mdb\.Job\(.*?\)", '# DELETED', script)
     # Append custom job control
     script += create_job_control(settings)
