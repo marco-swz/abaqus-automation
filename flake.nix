@@ -16,6 +16,7 @@
                 (python311.withPackages (ps: with ps; [
                     numpy
                     polars
+
                 ]))
             ];
         };
