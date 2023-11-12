@@ -11,14 +11,18 @@
             inherit system;
         };
     in rec {
-        devShell = pkgs.mkShell {
-            buildInputs = with pkgs; [
-                (python311.withPackages (ps: with ps; [
-                    numpy
-                    polars
-
-                ]))
-            ];
-        };
+        devShell = (pkgs.buildFHSUserEnv {
+          name = "pipzone";
+          targetPkgs = pkgs: (with pkgs; [
+            (python39.withPackages(ps: with ps; [
+                pip
+                numpy
+            ]))
+          ]);
+          profile = ''
+            export TEST="test"
+          '';
+          runScript = "bash";
+        }).env;
     });
 }
