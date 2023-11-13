@@ -22,6 +22,14 @@ Mdb()
 #: A new model database has been created.
 #: The model "Model-1" has been created.
 # DELETED
+#Blechgroesse
+breite = 15.0
+hoehe = 2.
+laenge = 150
+#Vernetzung
+dickenelement = hoehe/2
+biegeelement = 2
+globalelement = 10
 s = mdb.models['Model-1'].ConstrainedSketch(name='__profile__', 
     sheetSize=200.0)
 g, v, d, c = s.geometry, s.vertices, s.dimensions, s.constraints
@@ -46,28 +54,19 @@ s.unsetPrimaryObject()
 p = mdb.models['Model-1'].parts['Stempel']
 # DELETED
 del mdb.models['Model-1'].sketches['__profile__']
-s1 = mdb.models['Model-1'].ConstrainedSketch(name='__profile__', 
-    sheetSize=200.0)
-g, v, d, c = s1.geometry, s1.vertices, s1.dimensions, s1.constraints
-s1.setPrimaryObject(option=STANDALONE)
-s1.rectangle(point1=(-45.0, 1.25), point2=(35.0, -1.25))
-s1.ObliqueDimension(vertex1=v[1], vertex2=v[2], textPoint=(-21.9754867553711, 
-    -4.7959156036377), value=150.0)
-s1.DistanceDimension(entity1=g[5], entity2=g[3], textPoint=(-37.4094352722168, 
-    -1.02040481567383), value=2.5)
 s = mdb.models['Model-1'].ConstrainedSketch(name='__profile__', 
     sheetSize=200.0)
 g, v, d, c = s.geometry, s.vertices, s.dimensions, s.constraints
 s.setPrimaryObject(option=STANDALONE)
 s.rectangle(point1=(-50.0, 1.25), point2=(55.0, -1.25))
 s.ObliqueDimension(vertex1=v[0], vertex2=v[1], textPoint=(-54.2282485961914, 
-    0.0512466430664062), value=2.5)
+    0.0512466430664062), value=hoehe)
 s.ObliqueDimension(vertex1=v[1], vertex2=v[2], textPoint=(-43.1570777893066, 
-    -3.84333610534668), value=150.0)
+    -3.84333610534668), value=laenge)
 p = mdb.models['Model-1'].Part(name='Blech', dimensionality=THREE_D, 
     type=DEFORMABLE_BODY)
 p = mdb.models['Model-1'].parts['Blech']
-p.BaseSolidExtrude(sketch=s, depth=50.0)
+p.BaseSolidExtrude(sketch=s, depth=breite)
 s.unsetPrimaryObject()
 p = mdb.models['Model-1'].parts['Blech']
 # DELETED
@@ -75,7 +74,7 @@ del mdb.models['Model-1'].sketches['__profile__']
 p = mdb.models['Model-1'].parts['Blech']
 f1, e, d1 = p.faces, p.edges, p.datums
 t = p.MakeSketchTransform(sketchPlane=f1[3], sketchUpEdge=e[8], 
-    sketchPlaneSide=SIDE1, origin=(25.0, 1.25, 25.0))
+    sketchPlaneSide=SIDE1, origin=(25.0, 1.25, breite/2))
 s1 = mdb.models['Model-1'].ConstrainedSketch(name='__profile__', 
     sheetSize=316.23, gridSpacing=7.9, transform=t)
 g, v, d, c = s1.geometry, s1.vertices, s1.dimensions, s1.constraints
@@ -144,7 +143,9 @@ p.PartitionCellBySweepEdge(sweepPath=e1[15], cells=pickedCells,
     edges=pickedEdges)
 # DELETED
 # DELETED
+#Material festlegen
 mdb.models['Model-1'].Material(name='Aluminium')
+mdb.models['Model-1'].materials['Aluminium'].Density(table=((2.66e-09, ), ))
 mdb.models['Model-1'].materials['Aluminium'].Elastic(table=((70000.0, 0.3), ))
 mdb.models['Model-1'].materials['Aluminium'].Plastic(scaleStress=None, table=((
     305.0, 0.0), (309.0, 0.001125), (320.0, 0.013996), (331.0, 0.118731), (
@@ -188,14 +189,17 @@ a.rotate(instanceList=('Stempel-1', 'Stempel-2', 'Stempel-3'), axisPoint=(0.0,
     0.0, 100.0), axisDirection=(0.0, 0.0, -10.0), angle=90.0)
 #: The instances were rotated by 90. degrees about the axis defined by the point 0., 0., 100. and the vector 0., 0., -10.
 a = mdb.models['Model-1'].rootAssembly
-a.translate(instanceList=('Stempel-3', ), vector=(25.0, 6.25, 30.0))
+a.translate(instanceList=('Stempel-3', ), vector=(25.0, 6.75, 30.0))
 #: The instance Stempel-3 was translated by 25., 6.25, 30. with respect to the assembly coordinate system
+a.translate(instanceList=('Stempel-3', ), vector=(0.0, -1, -(50-breite)/2))
 a = mdb.models['Model-1'].rootAssembly
 a.translate(instanceList=('Stempel-2', ), vector=(-35.0, -6.25, 30.0))
 #: The instance Stempel-2 was translated by -35., -6.25, 30. with respect to the assembly coordinate system
+a.translate(instanceList=('Stempel-2', ), vector=(0.0, 0.0, -(50-breite)/2))
 a = mdb.models['Model-1'].rootAssembly
 a.translate(instanceList=('Stempel-1', ), vector=(85.0, -6.25, 30.0))
 #: The instance Stempel-1 was translated by 85., -6.25, 30. with respect to the assembly coordinate system
+a.translate(instanceList=('Stempel-1', ), vector=(0.0, 0.0, -(50-breite)/2))
 # DELETED
 # DELETED
 a = mdb.models['Model-1'].rootAssembly
@@ -273,7 +277,7 @@ side1Faces1 = s1.getSequenceFromMask(mask=('[#0 #11d200 ]', ), )
 region2=regionToolset.Region(side1Faces=side1Faces1)
 mdb.models['Model-1'].SurfaceToSurfaceContactStd(name='Stempel', 
     createStepName='Initial', main=region1, secondary=region2, sliding=FINITE, 
-    thickness=ON, interactionProperty='Reibung', adjustMethod=NONE, 
+    thickness=ON, interactionProperty='Reibung', adjustMethod=OVERCLOSED, 
     initialClearance=OMIT, datumAxis=None, clearanceRegion=None)
 #: The interaction "Stempel" has been created.
 # DELETED
@@ -323,11 +327,15 @@ mdb.models['Model-1'].DisplacementBC(name='Stempel', createStepName='Initial',
     region=region, u1=SET, u2=UNSET, u3=SET, ur1=SET, ur2=SET, ur3=SET, 
     amplitude=UNSET, distributionType=UNIFORM, fieldName='', localCsys=None)
 # DELETED
+#Verfahren Stempel
 mdb.models['Model-1'].boundaryConditions['Stempel'].setValuesInStep(
     stepName='Verformen', u2=1.0, amplitude='StempelWeg')
 mdb.models['Model-1'].amplitudes['StempelWeg'].setValues(timeSpan=TOTAL, 
     smooth=SOLVER_DEFAULT, data=((0.0, 0.0), (1.0, -20.0), (2.0, -20.0), (3.0, 
     0.0)))
+#Eigengewicht
+#mdb.models['Model-1'].Gravity(comp2=-9810.0, createStepName='Verformen', 
+#   distributionType=UNIFORM, field='', name='Eigengewicht')
 # DELETED
 # DELETED
 a = mdb.models['Model-1'].rootAssembly
@@ -351,7 +359,7 @@ p.seedPart(size=2.0, deviationFactor=0.1, minSizeFactor=0.1)
 p = mdb.models['Model-1'].parts['Blech']
 e = p.edges
 pickedEdges = e.getSequenceFromMask(mask=('[#90441104 #81021010 #28 ]', ), )
-p.seedEdgeBySize(edges=pickedEdges, size=0.5, deviationFactor=0.1, 
+p.seedEdgeBySize(edges=pickedEdges, size=dickenelement, deviationFactor=0.1, 
     minSizeFactor=0.1, constraint=FINER)
 elemType1 = mesh.ElemType(elemCode=C3D8R, elemLibrary=STANDARD, 
     kinematicSplit=AVERAGE_STRAIN, secondOrderAccuracy=OFF, 
@@ -365,14 +373,16 @@ pickedRegions =(cells, )
 p.setElementType(regions=pickedRegions, elemTypes=(elemType1, elemType2, 
     elemType3))
 p = mdb.models['Model-1'].parts['Blech']
-p.generateMesh()
+#p.generateMesh()
 a1 = mdb.models['Model-1'].rootAssembly
 a1.regenerate()
 a = mdb.models['Model-1'].rootAssembly
 # DELETED
 # DELETED
 # DELETED
-mdb.saveAs(pathName='C:/temp/3Punkt_Biegen')
+#pathFile = getcwd
+#fullpathFile = pathFile+'/3Punkt_Biegen'
+mdb.saveAs('3Punkt_Biegen')
 #: The model database has been saved to "C:\temp\3Punkt_Biegen.cae".
 # DELETED
 mdb.save()
@@ -487,7 +497,7 @@ side1Faces1 = s1.getSequenceFromMask(mask=('[#71c7000 #4000c ]', ), )
 region2=a.Surface(side1Faces=side1Faces1, name='Blech_unten')
 mdb.models['Model-1'].SurfaceToSurfaceContactStd(name='AuflageA', 
     createStepName='Initial', main=region1, secondary=region2, sliding=FINITE, 
-    thickness=ON, interactionProperty='Reibung', adjustMethod=NONE, 
+    thickness=ON, interactionProperty='Reibung', adjustMethod=OVERCLOSED, 
     initialClearance=OMIT, datumAxis=None, clearanceRegion=None)
 #: The interaction "AuflageA" has been created.
 a = mdb.models['Model-1'].rootAssembly
@@ -498,7 +508,7 @@ a = mdb.models['Model-1'].rootAssembly
 region2=a.surfaces['Blech_unten']
 mdb.models['Model-1'].SurfaceToSurfaceContactStd(name='AuflageB', 
     createStepName='Initial', main=region1, secondary=region2, sliding=FINITE, 
-    thickness=ON, interactionProperty='Reibung', adjustMethod=NONE, 
+    thickness=ON, interactionProperty='Reibung', adjustMethod=OVERCLOSED, 
     initialClearance=OMIT, datumAxis=None, clearanceRegion=None)
 #: The interaction "AuflageB" has been created.
 # DELETED
@@ -513,6 +523,7 @@ mdb.models['Model-1'].DisplacementBC(name='BlechX', createStepName='Initial',
     region=region, u1=SET, u2=UNSET, u3=UNSET, ur1=UNSET, ur2=UNSET, ur3=UNSET, 
     amplitude=UNSET, distributionType=UNIFORM, fieldName='', localCsys=None)
 mdb.models['Model-1'].boundaryConditions['BlechX'].deactivate('Halten')
+mdb.models['Model-1'].boundaryConditions['BlechZ'].deactivate('Halten')
 # DELETED
 mdb.save()
 #: The model database has been saved to "C:\temp\3Punkt_Biegen.cae".
@@ -554,12 +565,144 @@ a = mdb.models['Model-1'].rootAssembly
 #: Job Biegen completed successfully. 
 # DELETED
 # DELETED
+#Entfernen der Partitionen
+del mdb.models['Model-1'].parts['Blech'].features['Partition cell-1']
+del mdb.models['Model-1'].parts['Blech'].features['Partition cell-2']
 a = mdb.models['Model-1'].rootAssembly
 # DELETED
+#Hinzufügen neue Partition
+mdb.models['Model-1'].ConstrainedSketch(name='__edit__', objectToCopy=
+    mdb.models['Model-1'].parts['Blech'].features['Partition face-1'].sketch)
+mdb.models['Model-1'].parts['Blech'].projectReferencesOntoSketch(filter=
+    COPLANAR_EDGES, sketch=mdb.models['Model-1'].sketches['__edit__'], 
+    upToFeature=
+    mdb.models['Model-1'].parts['Blech'].features['Partition face-1'])
+mdb.models['Model-1'].sketches['__edit__'].Line(point1=(-5.925, 7.5), point2=(
+    -5.925, -7.5))
+mdb.models['Model-1'].sketches['__edit__'].VerticalConstraint(addUndoState=
+    False, entity=mdb.models['Model-1'].sketches['__edit__'].geometry[12])
+mdb.models['Model-1'].sketches['__edit__'].PerpendicularConstraint(
+    addUndoState=False, entity1=
+    mdb.models['Model-1'].sketches['__edit__'].geometry[3], entity2=
+    mdb.models['Model-1'].sketches['__edit__'].geometry[12])
+mdb.models['Model-1'].sketches['__edit__'].CoincidentConstraint(addUndoState=
+    False, entity1=mdb.models['Model-1'].sketches['__edit__'].vertices[14], 
+    entity2=mdb.models['Model-1'].sketches['__edit__'].geometry[3])
+mdb.models['Model-1'].sketches['__edit__'].CoincidentConstraint(addUndoState=
+    False, entity1=mdb.models['Model-1'].sketches['__edit__'].vertices[15], 
+    entity2=mdb.models['Model-1'].sketches['__edit__'].geometry[4])
+mdb.models['Model-1'].sketches['__edit__'].Line(point1=(5.925, 7.5), point2=(
+    5.925, -7.5))
+mdb.models['Model-1'].sketches['__edit__'].VerticalConstraint(addUndoState=
+    False, entity=mdb.models['Model-1'].sketches['__edit__'].geometry[13])
+mdb.models['Model-1'].sketches['__edit__'].PerpendicularConstraint(
+    addUndoState=False, entity1=
+    mdb.models['Model-1'].sketches['__edit__'].geometry[3], entity2=
+    mdb.models['Model-1'].sketches['__edit__'].geometry[13])
+mdb.models['Model-1'].sketches['__edit__'].CoincidentConstraint(addUndoState=
+    False, entity1=mdb.models['Model-1'].sketches['__edit__'].vertices[16], 
+    entity2=mdb.models['Model-1'].sketches['__edit__'].geometry[3])
+mdb.models['Model-1'].sketches['__edit__'].CoincidentConstraint(addUndoState=
+    False, entity1=mdb.models['Model-1'].sketches['__edit__'].vertices[17], 
+    entity2=mdb.models['Model-1'].sketches['__edit__'].geometry[4])
+mdb.models['Model-1'].sketches['__edit__'].SymmetryConstraint(entity1=
+    mdb.models['Model-1'].sketches['__edit__'].geometry[12], entity2=
+    mdb.models['Model-1'].sketches['__edit__'].geometry[13], symmetryAxis=
+    mdb.models['Model-1'].sketches['__edit__'].geometry[10])
+mdb.models['Model-1'].sketches['__edit__'].DistanceDimension(entity1=
+    mdb.models['Model-1'].sketches['__edit__'].geometry[12], entity2=
+    mdb.models['Model-1'].sketches['__edit__'].geometry[13], textPoint=(
+    6.53984069824219, 13.1113624572754), value=12.0)
+mdb.models['Model-1'].parts['Blech'].features['Partition face-1'].setValues(
+    sketch=mdb.models['Model-1'].sketches['__edit__'])
+del mdb.models['Model-1'].sketches['__edit__']
+mdb.models['Model-1'].parts['Blech'].checkGeometry()
+mdb.models['Model-1'].parts['Blech'].backup()
+mdb.models['Model-1'].parts['Blech'].regenerate()
+mdb.models['Model-1'].parts['Blech'].PartitionCellBySweepEdge(cells=
+    mdb.models['Model-1'].parts['Blech'].cells.getSequenceFromMask(('[#1 ]', ), 
+    ), edges=(mdb.models['Model-1'].parts['Blech'].edges[4], 
+    mdb.models['Model-1'].parts['Blech'].edges[13], 
+    mdb.models['Model-1'].parts['Blech'].edges[20], 
+    mdb.models['Model-1'].parts['Blech'].edges[31], 
+    mdb.models['Model-1'].parts['Blech'].edges[35], 
+    mdb.models['Model-1'].parts['Blech'].edges[43]), sweepPath=
+    mdb.models['Model-1'].parts['Blech'].edges[45])
+mdb.models['Model-1'].parts['Blech'].PartitionCellBySweepEdge(cells=
+    mdb.models['Model-1'].parts['Blech'].cells.getSequenceFromMask(('[#2 ]', ), 
+    ), edges=(mdb.models['Model-1'].parts['Blech'].edges[18], 
+    mdb.models['Model-1'].parts['Blech'].edges[26], 
+    mdb.models['Model-1'].parts['Blech'].edges[32], 
+    mdb.models['Model-1'].parts['Blech'].edges[38], 
+    mdb.models['Model-1'].parts['Blech'].edges[41], 
+    mdb.models['Model-1'].parts['Blech'].edges[50]), sweepPath=
+    mdb.models['Model-1'].parts['Blech'].edges[53])
+mdb.models['Model-1'].parts['Blech'].PartitionCellBySweepEdge(cells=
+    mdb.models['Model-1'].parts['Blech'].cells.getSequenceFromMask(('[#7 ]', ), 
+    ), edges=(mdb.models['Model-1'].parts['Blech'].edges[44], 
+    mdb.models['Model-1'].parts['Blech'].edges[51], 
+    mdb.models['Model-1'].parts['Blech'].edges[54]), sweepPath=
+    mdb.models['Model-1'].parts['Blech'].edges[62])
+mdb.models['Model-1'].parts['Blech'].PartitionCellBySweepEdge(cells=
+    mdb.models['Model-1'].parts['Blech'].cells.getSequenceFromMask(('[#1c ]', 
+    ), ), edges=(mdb.models['Model-1'].parts['Blech'].edges[65], 
+    mdb.models['Model-1'].parts['Blech'].edges[69], 
+    mdb.models['Model-1'].parts['Blech'].edges[70]), sweepPath=
+    mdb.models['Model-1'].parts['Blech'].edges[11])
+mdb.models['Model-1'].parts['Blech'].PartitionCellBySweepEdge(cells=
+    mdb.models['Model-1'].parts['Blech'].cells.getSequenceFromMask(('[#8c ]', 
+    ), ), edges=(mdb.models['Model-1'].parts['Blech'].edges[75], 
+    mdb.models['Model-1'].parts['Blech'].edges[77], 
+    mdb.models['Model-1'].parts['Blech'].edges[79]), sweepPath=
+    mdb.models['Model-1'].parts['Blech'].edges[11])
+mdb.models['Model-1'].parts['Blech'].PartitionCellBySweepEdge(cells=
+    mdb.models['Model-1'].parts['Blech'].cells.getSequenceFromMask(('[#8c ]', 
+    ), ), edges=(mdb.models['Model-1'].parts['Blech'].edges[86], 
+    mdb.models['Model-1'].parts['Blech'].edges[88], 
+    mdb.models['Model-1'].parts['Blech'].edges[89]), sweepPath=
+    mdb.models['Model-1'].parts['Blech'].edges[11])
+mdb.models['Model-1'].parts['Blech'].PartitionCellBySweepEdge(cells=
+    mdb.models['Model-1'].parts['Blech'].cells.getSequenceFromMask(('[#1c ]', 
+    ), ), edges=(mdb.models['Model-1'].parts['Blech'].edges[97], 
+    mdb.models['Model-1'].parts['Blech'].edges[98], 
+    mdb.models['Model-1'].parts['Blech'].edges[100]), sweepPath=
+    mdb.models['Model-1'].parts['Blech'].edges[11])
+#Mesh
+mdb.models['Model-1'].parts['Blech'].seedEdgeBySize(constraint=FINER, 
+    deviationFactor=0.1, edges=
+    mdb.models['Model-1'].parts['Blech'].edges.getSequenceFromMask((
+    '[#0 #ebc01400 #40003e00 ]', ), ), minSizeFactor=0.1, size=biegeelement)
+mdb.models['Model-1'].parts['Blech'].seedPart(deviationFactor=0.1, 
+    minSizeFactor=0.1, size=globalelement)
+mdb.models['Model-1'].parts['Blech'].generateMesh()
+#Reselect Surface
+mdb.models['Model-1'].rootAssembly.Surface(name='Blech_unten', side1Faces=
+    mdb.models['Model-1'].rootAssembly.instances['Blech-1'].faces.getSequenceFromMask(
+    ('[#19054130 #1119054 #1000 ]', ), ))
+mdb.models['Model-1'].rootAssembly.Surface(name='BlechOben', side1Faces=
+    mdb.models['Model-1'].rootAssembly.instances['Blech-1'].faces.getSequenceFromMask(
+    ('[#0 #fc000000 #47ff ]', ), ))
+#Reattach BounderyCondition
+mdb.models['Model-1'].rootAssembly.Set(name='Mittelpunkt_Unten', vertices=
+    mdb.models['Model-1'].rootAssembly.instances['Blech-1'].vertices.getSequenceFromMask(
+    ('[#20000000 ]', ), ))
+mdb.models['Model-1'].boundaryConditions['BlechX'].setValues(region=
+    mdb.models['Model-1'].rootAssembly.sets['Mittelpunkt_Unten'])
+mdb.models['Model-1'].boundaryConditions['BlechZ'].setValues(region=
+    mdb.models['Model-1'].rootAssembly.sets['Mittelpunkt_Unten'])
+#Reselect Part for Material
+mdb.models['Model-1'].parts['Blech'].Set(cells=
+    mdb.models['Model-1'].parts['Blech'].cells.getSequenceFromMask((
+    '[#3ffff ]', ), ), name='Blech')
+#Reselect Auswertebereich
+mdb.models['Model-1'].rootAssembly.Set(cells=
+    mdb.models['Model-1'].rootAssembly.instances['Blech-1'].cells.getSequenceFromMask(
+    ('[#c24a ]', ), ), name='Auswertung')
 mdb.save()
 #: The model database has been saved to "C:\temp\3Punkt_Biegen.cae".
 print('Starting simulation')
 
+    
 job = mdb.Job(
     name='test', 
     model='Model-1', 
