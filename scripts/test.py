@@ -21,7 +21,6 @@ executeOnCaeStartup()
 Mdb()
 #: A new model database has been created.
 #: The model "Model-1" has been created.
-# DELETED
 #Blechgroesse
 breite = 15.0
 hoehe = 2.
