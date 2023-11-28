@@ -3,7 +3,6 @@
 # Abaqus/CAE Release 2022 replay file
 # Internal Version: 2021_09_15-19.57.30 176069
 # Run by fratschiller on Wed Oct 18 06:52:04 2023
-#
 
 # from driverUtils import executeOnCaeGraphicsStartup
 # executeOnCaeGraphicsStartup()
