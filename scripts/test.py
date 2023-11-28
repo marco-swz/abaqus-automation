@@ -219,9 +219,11 @@ mdb.models['Model-1'].StaticStep(name='Ausgansposition', previous='Halten',
     maxNumInc=100000, initialInc=0.05, minInc=1e-15)
 # DELETED
 regionDef=mdb.models['Model-1'].rootAssembly.sets['Auswertung']
-mdb.models['Model-1'].historyOutputRequests['H-Output-1'].setValues(variables=(
+#mdb.models['Model-1'].historyOutputRequests['H-Output-1'].setValues(variables=(
     'COOR1', 'COOR2', 'COOR3'), region=regionDef, sectionPoints=DEFAULT, 
     rebar=EXCLUDE)
+mdb.models['Model-1'].FieldOutputRequest(name='Auswerte_Variable', 
+        createStepName='Verformen', variables=('S', 'RF', 'COORD'))
 # DELETED
 mdb.models['Model-1'].ContactProperty('Reibung')
 mdb.models['Model-1'].interactionProperties['Reibung'].TangentialBehavior(
