@@ -8,3 +8,5 @@
 *.prt
 *.cae
 *.exception
+*.json
+data/

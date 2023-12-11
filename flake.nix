@@ -50,7 +50,10 @@
                 pip
                 numpy
                 abqpy
+                matplotlib
+                polars
             ]))
+            nodePackages.pyright
           ]);
           runScript = "bash";
         }).env;
