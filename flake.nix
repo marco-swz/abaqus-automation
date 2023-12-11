@@ -52,6 +52,7 @@
                 abqpy
                 matplotlib
                 polars
+                pyarrow
             ]))
             nodePackages.pyright
           ]);

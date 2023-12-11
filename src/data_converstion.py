@@ -1,3 +1,5 @@
+import pyarrow as pa
+import pyarrow.dataset as ds
 import json
 import polars as pl
 import numpy as np
@@ -30,6 +32,28 @@ def to_table(data: dict):
 
                     table.append(row)
     return table
+
+def to_dataset(data: dict):
+    table = pa.table(data)
+    part = ds.partitioning(dictionaries=data, flavor='hive')
+    ds.write_dataset(table, partitioning=part, base_dir='data/arrow', format="parquet")
+    #ds.write_dataset(arr, 'data/arrow', format="parquet")
+    return
+    table = []
+    for step_name, step in data.items():
+        for frame_num, frame in step.items():
+            for val_type, nodes in frame.items():
+                for node in nodes:
+                    node_padded = [np.NaN]*6
+                    if isinstance(node, float):
+                        node = [node]
+                    node_padded[:len(node)] = node
+
+                    table.append(node_padded)
+                table = pa.Table.from_arrays(np.array(table).T, names=['Val1','Val2','Val3','Val4','Val5','Val6'])
+                print(table)
+                exit()
+
 
 def save_table_as_parquet(table: list, path: str):
     df = pl.DataFrame(table)
@@ -94,11 +118,12 @@ def save_as_pickle(data, path):
 
 if __name__ == '__main__':
     data = read_data('data/data.json')
-    table = to_table(data)
+    #table = to_table(data)
+    table = to_dataset(data)
     #save_table_as_csv(table, 'data/data.csv')
     #save_table_as_parquet(table, 'data/data.parquet')
     #save_as_pickle(table, 'data/table.pickle')
     #save_as_pickle(data, 'data/data.pickle')
     #save_as_compressed(data, 'data/data.gz')
-    save_table_as_sqlite(table, 'data/data.sqlite')
+    #save_table_as_sqlite(table, 'data/data.sqlite')
 
