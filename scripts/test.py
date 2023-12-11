@@ -28,6 +28,13 @@ laenge = 150
 dickenelement = hoehe/2
 biegeelement = 2
 globalelement = 10
+#Material
+material_Name = 'Stahl'
+Dichte = 0.00000000785 #kg/mm^3
+E_Modul = 210000 #MPa
+Poisson = 0.3 
+
+
 s = mdb.models['Model-1'].ConstrainedSketch(name='__profile__', 
     sheetSize=200.0)
 g, v, d, c = s.geometry, s.vertices, s.dimensions, s.constraints
@@ -142,14 +149,14 @@ p.PartitionCellBySweepEdge(sweepPath=e1[15], cells=pickedCells,
 # DELETED
 # DELETED
 #Material festlegen
-mdb.models['Model-1'].Material(name='Aluminium')
-mdb.models['Model-1'].materials['Aluminium'].Density(table=((2.66e-09, ), ))
-mdb.models['Model-1'].materials['Aluminium'].Elastic(table=((70000.0, 0.3), ))
-mdb.models['Model-1'].materials['Aluminium'].Plastic(scaleStress=None, table=((
+mdb.models['Model-1'].Material(name=material_Name)
+mdb.models['Model-1'].materials[material_Name].Density(table=((Dichte, ), ))
+mdb.models['Model-1'].materials[material_Name].Elastic(table=((E_Modul, Poisson), ))
+mdb.models['Model-1'].materials[material_Name].Plastic(scaleStress=None, table=((
     305.0, 0.0), (309.0, 0.001125), (320.0, 0.013996), (331.0, 0.118731), (
     340.0, 0.281615), (350.0, 0.481607), (360.0, 0.78642), (370.0, 1.18941)))
 mdb.models['Model-1'].HomogeneousSolidSection(name='Material', 
-    material='Aluminium', thickness=None)
+    material=material_Name, thickness=None)
 p = mdb.models['Model-1'].parts['Blech']
 c = p.cells
 cells = c.getSequenceFromMask(mask=('[#fff ]', ), )
@@ -220,8 +227,8 @@ mdb.models['Model-1'].StaticStep(name='Ausgansposition', previous='Halten',
 # DELETED
 regionDef=mdb.models['Model-1'].rootAssembly.sets['Auswertung']
 #mdb.models['Model-1'].historyOutputRequests['H-Output-1'].setValues(variables=(
-    'COOR1', 'COOR2', 'COOR3'), region=regionDef, sectionPoints=DEFAULT, 
-    rebar=EXCLUDE)
+#    'COOR1', 'COOR2', 'COOR3'), region=regionDef, sectionPoints=DEFAULT, 
+#   rebar=EXCLUDE)
 mdb.models['Model-1'].FieldOutputRequest(name='Auswerte_Variable', 
         createStepName='Verformen', variables=('S', 'RF', 'COORD'))
 # DELETED
