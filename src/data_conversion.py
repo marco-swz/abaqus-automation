@@ -6,6 +6,14 @@ import numpy as np
 import pickle
 import gzip
 import sqlite3
+from dataclasses import dataclass
+
+@dataclass
+class Dataset:
+    steps: ... 
+    frames: ...
+    types: ...
+    nodes: ...
 
 def read_data(path: str) -> dict:
     file = open(path)
@@ -33,27 +41,48 @@ def to_table(data: dict):
                     table.append(row)
     return table
 
-def to_dataset(data: dict):
+def to_dataset(data):
+    table_steps = []
+    table_nodes = []
+    table_frames = []
+    types_unique = {}
+    types_id = -1
+    for step_id, step_name in enumerate(data.keys()):
+        table_steps.append([step_id, step_name])
+        step = data[step_name]
+
+        for frame_id, frame_num in enumerate(step.keys()):
+            table_frames.append([frame_id, step_id, frame_num])
+
+            for node_type, nodes in step[frame_num].items():
+                type_id = types_unique.get(node_type)
+                if type_id is None:
+                    types_id += 1
+                    types_unique[node_type] = types_id
+                    type_id = types_id
+
+                for node_id, node in enumerate(nodes):
+                    node_padded = [node_id, type_id, frame_id] + [np.NaN]*5
+                    if isinstance(node, float):
+                        node = [node]
+                    node_padded[3:len(node)] = node
+
+                    table_nodes.append(node_padded)
+
+    table_types = [[id, type_name] for type_name, id in types_unique.items()]
+    print(table_nodes[0])
+    return Dataset(
+        steps=pl.DataFrame(table_steps, ['step_id', 'step_name']),
+        types=pl.DataFrame(table_types, ['type_id', 'type_name']),
+        frames=pl.DataFrame(table_frames, ['frame_id', 'step_id', 'frame_num']),
+        nodes=pl.DataFrame(table_nodes, ['node_id', 'type_id', 'frame_id', 'val1', 'val2', 'val3', 'val4', 'val5', 'val6']),
+    )
+
+def to_dataset2(data: dict):
     table = pa.table(data)
     part = ds.partitioning(dictionaries=data, flavor='hive')
     ds.write_dataset(table, partitioning=part, base_dir='data/arrow', format="parquet")
     #ds.write_dataset(arr, 'data/arrow', format="parquet")
-    return
-    table = []
-    for step_name, step in data.items():
-        for frame_num, frame in step.items():
-            for val_type, nodes in frame.items():
-                for node in nodes:
-                    node_padded = [np.NaN]*6
-                    if isinstance(node, float):
-                        node = [node]
-                    node_padded[:len(node)] = node
-
-                    table.append(node_padded)
-                table = pa.Table.from_arrays(np.array(table).T, names=['Val1','Val2','Val3','Val4','Val5','Val6'])
-                print(table)
-                exit()
-
 
 def save_table_as_parquet(table: list, path: str):
     df = pl.DataFrame(table)
@@ -119,7 +148,6 @@ def save_as_pickle(data, path):
 if __name__ == '__main__':
     data = read_data('data/data.json')
     #table = to_table(data)
-    table = to_dataset(data)
     #save_table_as_csv(table, 'data/data.csv')
     #save_table_as_parquet(table, 'data/data.parquet')
     #save_as_pickle(table, 'data/table.pickle')
@@ -127,3 +155,5 @@ if __name__ == '__main__':
     #save_as_compressed(data, 'data/data.gz')
     #save_table_as_sqlite(table, 'data/data.sqlite')
 
+    dataset = to_dataset(data)
+    print(dataset)
