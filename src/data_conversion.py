@@ -17,12 +17,6 @@ class Dataset:
     types: ...
     nodes: ...
 
-    def write_parquet(self, dir: str):
-        self.steps.write_parquet(dir+'/steps.parquet')
-        self.frames.write_parquet(dir+'/frames.parquet')
-        self.types.write_parquet(dir+'/types.parquet')
-        self.nodes.write_parquet(dir+'/nodes.parquet')
-
 def read_data(path: str) -> dict:
     file = open(path)
     data = json.load(file)
@@ -33,6 +27,7 @@ def to_table(data: dict) -> pl.DataFrame:
     table = [];
     for step_name, step in data.items():
         for frame_num, frame in step.items():
+            print(step_name, frame_num)
             for val_type, nodes in frame.items():
                 for node in nodes:
                     node_padded = [np.NaN]*6
@@ -93,51 +88,120 @@ def to_dataset2(data: dict):
     ds.write_dataset(table, partitioning=part, base_dir='data/arrow', format="parquet")
     #ds.write_dataset(arr, 'data/arrow', format="parquet")
 
-def save_table_as_parquet(table: pl.DataFrame, path: str):
-    table.write_parquet(path)
+class ParquetTable:
+    @staticmethod
+    def convert(in_path: str, out_path: str):
+        data = read_data(in_path)
+        table = to_table(data)
+        table.write_parquet(out_path)
 
-def save_table_as_csv(table: pl.DataFrame, path: str):
-    table.write_csv(path)
+    @staticmethod
+    def read_batch(path, steps, types, frames):
+        table = pl.read_parquet(path)
 
-def save_table_as_sqlite(table: pl.DataFrame, path: str):
-    conn = sqlite3.connect(path)
+        table.filter(
+            pl.col('step_name').is_in(steps['step_name']) & 
+            pl.col('val_type').is_in(types['type_name']) & 
+            pl.col('frame_num').is_in(frames['frame_num'])
+        )
 
-    with conn:
-        sql = '''
-            CREATE TABLE IF NOT EXISTS data(
-                id integer PRIMARY KEY,
-                step_name text,
-                frame_num text,
-                type_name text,
-                val1 real,
-                val2 real,
-                val3 real,
-                val4 real,
-                val5 real,
-                val6 real
-            );
-        '''
-        cur = conn.cursor()
-        cur.execute(sql)
-        conn.commit()
+class ParquetDataset:
+    @staticmethod
+    def convert(in_path: str, out_dir: str):
+        data = read_data(in_path)
+        dataset = to_dataset(data)
+        dataset.steps.write_parquet(out_dir+'/steps.parquet')
+        dataset.frames.write_parquet(out_dir+'/frames.parquet')
+        dataset.types.write_parquet(out_dir+'/types.parquet')
+        dataset.nodes.write_parquet(out_dir+'/nodes.parquet')
 
-        for row in table:
+    @staticmethod
+    def read_batch(path, steps, types, frames):
+        pass
+
+class CsvTable:
+    @staticmethod
+    def convert(in_path: str, out_path: str):
+        data = read_data(in_path)
+        table = to_table(data) 
+        table.write_csv(out_path)
+
+    @staticmethod
+    def read_batch(path, steps, types, frames):
+        table = pl.read_csv(path, dtypes={ 'frame_num': pl.Utf8 })
+
+        table.filter(
+            pl.col('step_name').is_in(steps['step_name']) & 
+            pl.col('val_type').is_in(types['type_name']) & 
+            pl.col('frame_num').is_in(frames['frame_num'])
+        )
+
+class SqliteTable:
+    @staticmethod
+    def convert(in_path: str, out_path: str):
+        data = read_data(in_path)
+        table = to_table(data) 
+        conn = sqlite3.connect(out_path)
+
+        with conn:
             sql = '''
-                INSERT INTO data(
-                    step_name,
-                    frame_num,
-                    type_name,
-                    val1,
-                    val2,
-                    val3,
-                    val4,
-                    val5,
-                    val6
-                ) VALUES (?,?,?,?,?,?,?,?,?)
+                CREATE TABLE IF NOT EXISTS data(
+                    id integer PRIMARY KEY,
+                    step_name text,
+                    frame_num text,
+                    type_name text,
+                    val1 real,
+                    val2 real,
+                    val3 real,
+                    val4 real,
+                    val5 real,
+                    val6 real
+                );
             '''
             cur = conn.cursor()
-            cur.execute(sql, row)
-        conn.commit()
+            cur.execute(sql)
+            conn.commit()
+
+            for row in table.rows():
+                sql = '''
+                    INSERT INTO data(
+                        step_name,
+                        frame_num,
+                        type_name,
+                        val1,
+                        val2,
+                        val3,
+                        val4,
+                        val5,
+                        val6
+                    ) VALUES (?,?,?,?,?,?,?,?,?)
+                '''
+                cur = conn.cursor()
+                cur.execute(sql, row)
+            conn.commit()
+
+    @staticmethod
+    def read_batch(path, steps: pl.DataFrame, types, frames):
+        step_list = steps['step_name'].str.concat('","').to_list()[0]
+        type_list = types['type_name'].str.concat('","').to_list()[0]
+        frames_list = frames['frame_num'].str.concat('","').to_list()[0]
+
+        conn = sqlite3.connect(path)
+        with conn:
+            sql = f'''
+                select 
+                    *
+                from
+                    data
+                where
+                    step_name in ("{step_list}")
+                and type_name in ("{type_list}")
+                and frame_num in ("{frames_list}")
+            '''
+            cur = conn.cursor()
+            cur.execute(sql)
+            cur.fetchall()
+            conn.commit()
 
 def save_as_compressed(data, path: str):
     json_data = json.dumps(data)
@@ -147,28 +211,61 @@ def save_as_compressed(data, path: str):
     file.write(compressed)
     file.close()
 
-def save_as_pickle(data, path):
-    file = open(path, 'wb')
-    pickle.dump(data, file)
-    file.close()
+class PickleDict:
+    def convert(self, path: str):
+        data = read_data(path)
+        file = open(path, 'wb')
+        pickle.dump(data, file)
+        file.close()
 
-def save_table_as_arrow_table(table, path: str):
-    table = from_dataframe(table)
-    pq.write_table(table, path)
+    def read_batch(self, steps, types, frames):
+        pass
 
-def save_table_as_arrow_dataset(table, path: str):
-    table = from_dataframe(table)
-    part = ds.partitioning(pa.schema([
-        ('step_name', pa.large_string()),
-        ('frame_num', pa.int32()),
-    ]), flavor=None)
 
-    ds.write_dataset(table, path, format='parquet', partitioning=part)
+class ArrowTable:
+    def convert(self, path: str):
+        data = read_data(path)
+        table = to_table(data)
+        table = from_dataframe(table)
+        pq.write_table(table, path)
+
+class ArrowDataset:
+    def convert(self, path: str):
+        data = read_data(path)
+        table = to_table(data)
+        table = from_dataframe(table)
+        part = ds.partitioning(pa.schema([
+            ('step_name', pa.large_string()),
+            ('frame_num', pa.int32()),
+        ]), flavor=None)
+
+        ds.write_dataset(table, path, format='parquet', partitioning=part)
+
+def read_batch(path: str, storage):
+    data = read_data('data/data.json')
+    dataset = to_dataset(data)
+
+
+    steps = dataset.steps.sample(fraction=0.67)
+    types = dataset.types.sample(fraction=0.67)
+    frames = dataset.frames\
+        .filter(pl.col('step_id').is_in(steps['step_id']))
+
+    storage.read_batch(path, steps, types, frames)
 
 
 if __name__ == '__main__':
-    data = read_data('data/data.json')
-    table = to_table(data)
+    #CsvTable.convert('data/data.json', 'data/table.csv')
+    #read_batch('data/table.csv', CsvTable)
+
+    #ParquetTable.convert('data/data.json', 'data/table.parquet')
+    #read_batch('data/table.parquet', ParquetTable)
+
+    #SqliteTable.convert('data/data.json', 'data/table.sqlite')
+    read_batch('data/table.sqlite', SqliteTable)
+
+    #data = read_data('data/data.json')
+    #table = to_table(data)
     #save_table_as_csv(table, 'data/data.csv')
     #save_table_as_parquet(table, 'data/data.parquet')
     #save_as_pickle(table, 'data/table.pickle')
@@ -176,7 +273,7 @@ if __name__ == '__main__':
     #save_as_compressed(data, 'data/data.gz')
     #save_table_as_sqlite(table, 'data/data.sqlite')
     #save_table_as_arrow_table(table, 'data/arrow-table')
-    save_table_as_arrow_dataset(table, 'data/arrow-dataset')
+    #save_table_as_arrow_dataset(table, 'data/arrow-dataset')
 
     #dataset = to_dataset(data)
     #dataset.to_parquet('data/polars')
