@@ -96,13 +96,13 @@ class ParquetTable:
         table.write_parquet(out_path)
 
     @staticmethod
-    def read_batch(path, steps, types, frames):
+    def read_batch(path, steps, types, num_samples):
         table = pl.read_parquet(path)
 
         table.filter(
             pl.col('step_name').is_in(steps['step_name']) & 
             pl.col('val_type').is_in(types['type_name']) & 
-            pl.col('frame_num').is_in(frames['frame_num'])
+            pl.col('frame_num').is_in(pl.col('frame_num').sample(num_samples, with_replacement=True))
         )
 
 class ParquetDataset:
@@ -116,8 +116,17 @@ class ParquetDataset:
         dataset.nodes.write_parquet(out_dir+'/nodes.parquet')
 
     @staticmethod
-    def read_batch(path, steps, types, frames):
-        pass
+    def read_batch(path, steps, types, num_frames):
+        table_frames = pl.read_parquet(path+'/frames.parquet')\
+            .filter(pl.col('step_id').is_in(steps['step_id']))\
+            .sample(num_frames, with_replacement=True)
+
+        samples = pl.read_parquet(path+'/nodes.parquet')\
+            .filter(
+                pl.col('type_id').is_in(types['type_id']) &
+                pl.col('frame_id').is_in(table_frames['frame_id'])
+            )
+        print(samples.shape)
 
 class CsvTable:
     @staticmethod
@@ -127,14 +136,16 @@ class CsvTable:
         table.write_csv(out_path)
 
     @staticmethod
-    def read_batch(path, steps, types, frames):
+    def read_batch(path, steps, types, num_samples: int):
         table = pl.read_csv(path, dtypes={ 'frame_num': pl.Utf8 })
 
-        table.filter(
-            pl.col('step_name').is_in(steps['step_name']) & 
-            pl.col('val_type').is_in(types['type_name']) & 
-            pl.col('frame_num').is_in(frames['frame_num'])
-        )
+        samples = table\
+            .filter(
+                pl.col('step_name').is_in(steps['step_name']) & 
+                pl.col('val_type').is_in(types['type_name']) &
+                pl.col('frame_num').is_in(pl.col('frame_num').sample(num_samples, with_replacement=True))
+            )
+        print(samples.shape)
 
 class SqliteTable:
     @staticmethod
@@ -181,13 +192,13 @@ class SqliteTable:
             conn.commit()
 
     @staticmethod
-    def read_batch(path, steps: pl.DataFrame, types, frames):
+    def read_batch(path, steps: pl.DataFrame, types, num_frames: int):
         step_list = steps['step_name'].str.concat('","').to_list()[0]
         type_list = types['type_name'].str.concat('","').to_list()[0]
-        frames_list = frames['frame_num'].str.concat('","').to_list()[0]
 
         conn = sqlite3.connect(path)
         with conn:
+            # TODO(marco): Fix query
             sql = f'''
                 select 
                     *
@@ -196,7 +207,16 @@ class SqliteTable:
                 where
                     step_name in ("{step_list}")
                 and type_name in ("{type_list}")
-                and frame_num in ("{frames_list}")
+                and frame_num in (
+                    select 
+                        frame_num
+                    from
+                        data
+                    where
+                        step_name in ("{step_list}")
+                        and type_name in ("{type_list}")
+                    order by random() limit {num_frames}
+                )
             '''
             cur = conn.cursor()
             cur.execute(sql)
@@ -248,10 +268,7 @@ def read_batch(path: str, storage):
 
     steps = dataset.steps.sample(fraction=0.67)
     types = dataset.types.sample(fraction=0.67)
-    frames = dataset.frames\
-        .filter(pl.col('step_id').is_in(steps['step_id']))
-
-    storage.read_batch(path, steps, types, frames)
+    storage.read_batch(path, steps, types, 10)
 
 
 if __name__ == '__main__':
@@ -262,7 +279,10 @@ if __name__ == '__main__':
     #read_batch('data/table.parquet', ParquetTable)
 
     #SqliteTable.convert('data/data.json', 'data/table.sqlite')
-    read_batch('data/table.sqlite', SqliteTable)
+    #read_batch('data/table.sqlite', SqliteTable)
+
+    ParquetDataset.convert('data/data.json', 'data/parquet')
+    read_batch('data/parquet', ParquetDataset)
 
     #data = read_data('data/data.json')
     #table = to_table(data)
