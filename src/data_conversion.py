@@ -1,6 +1,7 @@
 import pyarrow as pa
 import pyarrow.dataset as ds
 import pyarrow.parquet as pq
+import pyarrow.compute as pc
 from pyarrow.interchange import from_dataframe
 import json
 import polars as pl
@@ -82,12 +83,6 @@ def to_dataset(data) -> Dataset:
         nodes=pl.DataFrame(table_nodes, ['node_id', 'type_id', 'frame_id', 'val1', 'val2', 'val3', 'val4', 'val5', 'val6']),
     )
 
-def to_dataset2(data: dict):
-    table = pa.table(data)
-    part = ds.partitioning(dictionaries=data, flavor='hive')
-    ds.write_dataset(table, partitioning=part, base_dir='data/arrow', format="parquet")
-    #ds.write_dataset(arr, 'data/arrow', format="parquet")
-
 class ParquetTable:
     @staticmethod
     def convert(in_path: str, out_path: str):
@@ -96,14 +91,14 @@ class ParquetTable:
         table.write_parquet(out_path)
 
     @staticmethod
-    def read_batch(path, steps, types, num_samples):
+    def read_batch(path, steps, types):
         table = pl.read_parquet(path)
 
-        table.filter(
+        samples = table.filter(
             pl.col('step_name').is_in(steps['step_name']) & 
-            pl.col('val_type').is_in(types['type_name']) & 
-            pl.col('frame_num').is_in(pl.col('frame_num').sample(num_samples, with_replacement=True))
+            pl.col('val_type').is_in(types['type_name'])
         )
+        print(samples.shape)
 
 class ParquetDataset:
     @staticmethod
@@ -116,10 +111,9 @@ class ParquetDataset:
         dataset.nodes.write_parquet(out_dir+'/nodes.parquet')
 
     @staticmethod
-    def read_batch(path, steps, types, num_frames):
+    def read_batch(path, steps, types):
         table_frames = pl.read_parquet(path+'/frames.parquet')\
-            .filter(pl.col('step_id').is_in(steps['step_id']))\
-            .sample(num_frames, with_replacement=True)
+            .filter(pl.col('step_id').is_in(steps['step_id']))
 
         samples = pl.read_parquet(path+'/nodes.parquet')\
             .filter(
@@ -136,14 +130,13 @@ class CsvTable:
         table.write_csv(out_path)
 
     @staticmethod
-    def read_batch(path, steps, types, num_samples: int):
+    def read_batch(path, steps, types):
         table = pl.read_csv(path, dtypes={ 'frame_num': pl.Utf8 })
 
         samples = table\
             .filter(
                 pl.col('step_name').is_in(steps['step_name']) & 
-                pl.col('val_type').is_in(types['type_name']) &
-                pl.col('frame_num').is_in(pl.col('frame_num').sample(num_samples, with_replacement=True))
+                pl.col('val_type').is_in(types['type_name'])
             )
         print(samples.shape)
 
@@ -192,13 +185,12 @@ class SqliteTable:
             conn.commit()
 
     @staticmethod
-    def read_batch(path, steps: pl.DataFrame, types, num_frames: int):
+    def read_batch(path, steps: pl.DataFrame, types):
         step_list = steps['step_name'].str.concat('","').to_list()[0]
         type_list = types['type_name'].str.concat('","').to_list()[0]
 
         conn = sqlite3.connect(path)
         with conn:
-            # TODO(marco): Fix query
             sql = f'''
                 select 
                     *
@@ -207,21 +199,13 @@ class SqliteTable:
                 where
                     step_name in ("{step_list}")
                 and type_name in ("{type_list}")
-                and frame_num in (
-                    select 
-                        frame_num
-                    from
-                        data
-                    where
-                        step_name in ("{step_list}")
-                        and type_name in ("{type_list}")
-                    order by random() limit {num_frames}
-                )
             '''
             cur = conn.cursor()
             cur.execute(sql)
-            cur.fetchall()
+            samples = cur.fetchall()
             conn.commit()
+
+        print(pl.DataFrame(np.array(samples)).shape)
 
 def save_as_compressed(data, path: str):
     json_data = json.dumps(data)
@@ -231,27 +215,29 @@ def save_as_compressed(data, path: str):
     file.write(compressed)
     file.close()
 
-class PickleDict:
-    def convert(self, path: str):
-        data = read_data(path)
-        file = open(path, 'wb')
-        pickle.dump(data, file)
-        file.close()
-
-    def read_batch(self, steps, types, frames):
-        pass
-
-
 class ArrowTable:
-    def convert(self, path: str):
-        data = read_data(path)
+    @staticmethod
+    def convert(in_path: str, out_path: str):
+        data = read_data(in_path)
         table = to_table(data)
         table = from_dataframe(table)
-        pq.write_table(table, path)
+        pq.write_table(table, out_path)
+
+    @staticmethod
+    def read_batch(path, steps, types):
+        table = pq.read_table(path)
+        samples = table\
+            .filter(
+                pc.field('step_name').isin(steps['step_name']) &
+                pc.field('val_type').isin(types['type_name'])
+            )
+
+        print(samples.shape)
 
 class ArrowDataset:
-    def convert(self, path: str):
-        data = read_data(path)
+    @staticmethod
+    def convert(in_path: str, out_path: str):
+        data = read_data(in_path)
         table = to_table(data)
         table = from_dataframe(table)
         part = ds.partitioning(pa.schema([
@@ -259,30 +245,48 @@ class ArrowDataset:
             ('frame_num', pa.int32()),
         ]), flavor=None)
 
-        ds.write_dataset(table, path, format='parquet', partitioning=part)
+        ds.write_dataset(table, out_path, format='parquet', partitioning=part, existing_data_behavior='overwrite_or_ignore')
+
+    @staticmethod
+    def read_batch(path, steps, types):
+        dataset = ds.dataset(path)
+        samples = dataset\
+            .filter(
+                pc.field('step_id').isin(steps['step_id']) &
+                pc.field('type_id').isin(types['type_id'])
+            )
+
+        samples = pl.from_arrow(samples.to_table())
+        print(samples.shape)
+
 
 def read_batch(path: str, storage):
     data = read_data('data/data.json')
     dataset = to_dataset(data)
 
-
-    steps = dataset.steps.sample(fraction=0.67)
-    types = dataset.types.sample(fraction=0.67)
-    storage.read_batch(path, steps, types, 10)
+    steps = dataset.steps.sample(fraction=0.67, seed=0)
+    types = dataset.types.sample(fraction=0.67, seed=0)
+    storage.read_batch(path, steps, types)
 
 
 if __name__ == '__main__':
     #CsvTable.convert('data/data.json', 'data/table.csv')
-    #read_batch('data/table.csv', CsvTable)
+    read_batch('data/table.csv', CsvTable)
 
     #ParquetTable.convert('data/data.json', 'data/table.parquet')
-    #read_batch('data/table.parquet', ParquetTable)
+    read_batch('data/table.parquet', ParquetTable)
 
     #SqliteTable.convert('data/data.json', 'data/table.sqlite')
-    #read_batch('data/table.sqlite', SqliteTable)
+    read_batch('data/table.sqlite', SqliteTable)
 
-    ParquetDataset.convert('data/data.json', 'data/parquet')
+    #ParquetDataset.convert('data/data.json', 'data/parquet')
     read_batch('data/parquet', ParquetDataset)
+
+    #ArrowDataset.convert('data/data.json', 'data/arrow-dataset')
+    #read_batch('data/arrow-dataset', ArrowDataset)
+
+    #ArrowTable.convert('data/data.json', 'data/arrow-table')
+    read_batch('data/arrow-table', ArrowTable)
 
     #data = read_data('data/data.json')
     #table = to_table(data)
