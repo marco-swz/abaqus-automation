@@ -3,10 +3,10 @@ import pyarrow.dataset as ds
 import pyarrow.parquet as pq
 import pyarrow.compute as pc
 from pyarrow.interchange import from_dataframe
+import time
 import json
 import polars as pl
 import numpy as np
-import pickle
 import gzip
 import sqlite3
 from dataclasses import dataclass
@@ -28,7 +28,6 @@ def to_table(data: dict) -> pl.DataFrame:
     table = [];
     for step_name, step in data.items():
         for frame_num, frame in step.items():
-            print(step_name, frame_num)
             for val_type, nodes in frame.items():
                 for node in nodes:
                     node_padded = [np.NaN]*6
@@ -52,11 +51,14 @@ def to_dataset(data) -> Dataset:
     table_frames = []
     types_unique = {}
     types_id = -1
+    node_id = -1
+    frame_id = -1
     for step_id, step_name in enumerate(data.keys()):
         table_steps.append([step_id, step_name])
         step = data[step_name]
 
-        for frame_id, frame_num in enumerate(step.keys()):
+        for frame_num in step.keys():
+            frame_id += 1
             table_frames.append([frame_id, step_id, frame_num])
 
             for node_type, nodes in step[frame_num].items():
@@ -66,7 +68,8 @@ def to_dataset(data) -> Dataset:
                     types_unique[node_type] = types_id
                     type_id = types_id
 
-                for node_id, node in enumerate(nodes):
+                for node in nodes:
+                    node_id += 1
                     node_padded = [node_id, type_id, frame_id] + [np.NaN]*5
                     if isinstance(node, float):
                         node = [node]
@@ -98,7 +101,6 @@ class ParquetTable:
             pl.col('step_name').is_in(steps['step_name']) & 
             pl.col('val_type').is_in(types['type_name'])
         )
-        print(samples.shape)
 
 class ParquetDataset:
     @staticmethod
@@ -120,7 +122,6 @@ class ParquetDataset:
                 pl.col('type_id').is_in(types['type_id']) &
                 pl.col('frame_id').is_in(table_frames['frame_id'])
             )
-        print(samples.shape)
 
 class CsvTable:
     @staticmethod
@@ -131,14 +132,13 @@ class CsvTable:
 
     @staticmethod
     def read_batch(path, steps, types):
-        table = pl.read_csv(path, dtypes={ 'frame_num': pl.Utf8 })
+        table = pl.read_csv(path, dtypes={})
 
         samples = table\
             .filter(
                 pl.col('step_name').is_in(steps['step_name']) & 
                 pl.col('val_type').is_in(types['type_name'])
             )
-        print(samples.shape)
 
 class SqliteTable:
     @staticmethod
@@ -149,7 +149,14 @@ class SqliteTable:
 
         with conn:
             sql = '''
-                CREATE TABLE IF NOT EXISTS data(
+                DROP TABLE IF EXISTS data;
+            '''
+            cur = conn.cursor()
+            cur.execute(sql)
+            conn.commit()
+            
+            sql = '''
+                CREATE TABLE data(
                     id integer PRIMARY KEY,
                     step_name text,
                     frame_num text,
@@ -205,7 +212,138 @@ class SqliteTable:
             samples = cur.fetchall()
             conn.commit()
 
-        print(pl.DataFrame(np.array(samples)).shape)
+        samples = pl.DataFrame(np.array(samples))
+
+class SqliteDataset:
+    @staticmethod
+    def convert(in_path: str, out_path: str):
+        data = read_data(in_path)
+        dataset = to_dataset(data) 
+        conn = sqlite3.connect(out_path)
+
+        with conn:
+            cur = conn.cursor()
+
+            cur.execute('DROP TABLE IF EXISTS steps')
+            cur.execute('DROP TABLE IF EXISTS types')
+            cur.execute('DROP TABLE IF EXISTS frames')
+            cur.execute('DROP TABLE IF EXISTS nodes')
+            conn.commit()
+            
+            sql = '''
+                CREATE TABLE steps(
+                    step_id integer PRIMARY KEY,
+                    step_name text
+                );
+            '''
+            cur.execute(sql)
+
+            sql = '''
+                CREATE TABLE types(
+                    type_id integer PRIMARY KEY,
+                    type_name text
+                );
+            '''
+            cur.execute(sql)
+
+            sql = '''
+                CREATE TABLE frames(
+                    frame_id integer PRIMARY KEY,
+                    step_id integer,
+                    frame_num text
+                );
+            '''
+            cur.execute(sql)
+
+            sql = '''
+                CREATE TABLE nodes(
+                    node_id integer PRIMARY KEY,
+                    frame_id integer,
+                    type_id integer,
+                    val1 real,
+                    val2 real,
+                    val3 real,
+                    val4 real,
+                    val5 real,
+                    val6 real
+                );
+            '''
+            cur.execute(sql)
+
+            for step in dataset.steps.rows():
+                sql = '''
+                    INSERT INTO steps(
+                        step_id,
+                        step_name
+                    ) VALUES (?,?)
+                '''
+                cur.execute(sql, step)
+
+            for frame in dataset.frames.rows():
+                sql = '''
+                    INSERT INTO frames(
+                        frame_id,
+                        step_id,
+                        frame_num
+                    ) VALUES (?,?,?)
+                '''
+                cur.execute(sql, frame)
+
+            for types in dataset.types.rows():
+                sql = '''
+                    INSERT INTO types(
+                        type_id,
+                        type_name
+                    ) VALUES (?,?)
+                '''
+                cur.execute(sql, types)
+
+            for node in dataset.nodes.rows():
+                sql = '''
+                    INSERT INTO nodes(
+                        node_id,
+                        type_id,
+                        frame_id,
+                        val1,
+                        val2,
+                        val3,
+                        val4,
+                        val5,
+                        val6
+                    ) VALUES (?,?,?,?,?,?,?,?,?)
+                '''
+                cur.execute(sql, node)
+
+            conn.commit()
+
+    @staticmethod
+    def read_batch(path, steps: pl.DataFrame, types):
+        step_list = steps['step_id'].str.concat('","').to_list()[0]
+        type_list = types['type_id'].str.concat('","').to_list()[0]
+
+        conn = sqlite3.connect(path)
+        with conn:
+            sql = f'''
+                select 
+                    *
+                from
+                    nodes
+                where
+                    frame_id in (
+                        select
+                            frame_id 
+                        from
+                            frames
+                        where step_id in ("{step_list}")
+                    )
+                and type_id in ("{type_list}")
+            '''
+            cur = conn.cursor()
+            cur.execute(sql)
+            samples = cur.fetchall()
+            conn.commit()
+
+        samples = pl.DataFrame(np.array(samples))
 
 def save_as_compressed(data, path: str):
     json_data = json.dumps(data)
@@ -232,9 +370,8 @@ class ArrowTable:
                 pc.field('val_type').isin(types['type_name'])
             )
 
-        print(samples.shape)
 
-class ArrowDataset:
+class ArrowTablePart:
     @staticmethod
     def convert(in_path: str, out_path: str):
         data = read_data(in_path)
@@ -242,62 +379,62 @@ class ArrowDataset:
         table = from_dataframe(table)
         part = ds.partitioning(pa.schema([
             ('step_name', pa.large_string()),
-            ('frame_num', pa.int32()),
-        ]), flavor=None)
+            ('val_type', pa.large_string()),
+        ]), flavor='hive')
 
         ds.write_dataset(table, out_path, format='parquet', partitioning=part, existing_data_behavior='overwrite_or_ignore')
 
     @staticmethod
     def read_batch(path, steps, types):
-        dataset = ds.dataset(path)
-        samples = dataset\
-            .filter(
-                pc.field('step_id').isin(steps['step_id']) &
-                pc.field('type_id').isin(types['type_id'])
-            )
+        part = ds.partitioning(pa.schema([
+            ('step_name', pa.large_string()),
+            ('val_type', pa.large_string()),
+        ]), flavor='hive')
+        dataset = ds.dataset(path, partitioning=part)
+        samples = dataset.filter(
+            pc.field('step_name').isin(steps['step_name']) &
+            pc.field('val_type').isin(types['type_name'])
+        )
 
         samples = pl.from_arrow(samples.to_table())
-        print(samples.shape)
 
-
-def read_batch(path: str, storage):
-    data = read_data('data/data.json')
+def read_batch(input_file:str, path: str, storage):
+    data = read_data(input_file)
     dataset = to_dataset(data)
+    num_reads = 10
+    seeds = np.arange(0, num_reads)
+    timings = np.zeros(num_reads)
 
-    steps = dataset.steps.sample(fraction=0.67, seed=0)
-    types = dataset.types.sample(fraction=0.67, seed=0)
-    storage.read_batch(path, steps, types)
+    for i, seed in enumerate(seeds):
+        steps = dataset.steps.sample(fraction=0.67, seed=seed)
+        types = dataset.types.sample(fraction=0.67, seed=seed)
+        start = time.time()
+        storage.read_batch(path, steps, types)
+        timings[i] = time.time() - start
+
+    print(timings)
+    print(timings.mean())
 
 
 if __name__ == '__main__':
-    #CsvTable.convert('data/data.json', 'data/table.csv')
-    read_batch('data/table.csv', CsvTable)
+    input_file = 'data/data.json'
+    #CsvTable.convert(input_file, 'data/table.csv')
+    read_batch(input_file, 'data/table.csv', CsvTable)
 
-    #ParquetTable.convert('data/data.json', 'data/table.parquet')
-    read_batch('data/table.parquet', ParquetTable)
+    #ParquetTable.convert(input_file, 'data/table.parquet')
+    read_batch(input_file, 'data/table.parquet', ParquetTable)
 
-    #SqliteTable.convert('data/data.json', 'data/table.sqlite')
-    read_batch('data/table.sqlite', SqliteTable)
+    #SqliteTable.convert(input_file, 'data/table.sqlite')
+    read_batch(input_file, 'data/table.sqlite', SqliteTable)
 
-    #ParquetDataset.convert('data/data.json', 'data/parquet')
-    read_batch('data/parquet', ParquetDataset)
+    #SqliteDataset.convert(input_file, 'data/dataset.sqlite')
+    read_batch(input_file, 'data/dataset.sqlite', SqliteDataset)
 
-    #ArrowDataset.convert('data/data.json', 'data/arrow-dataset')
-    #read_batch('data/arrow-dataset', ArrowDataset)
+    #ParquetDataset.convert(input_file, 'data/parquet')
+    read_batch(input_file, 'data/parquet', ParquetDataset)
 
-    #ArrowTable.convert('data/data.json', 'data/arrow-table')
-    read_batch('data/arrow-table', ArrowTable)
+    #ArrowTablePart.convert(input_file, 'data/arrow-table-part')
+    read_batch(input_file, 'data/arrow-table-part', ArrowTablePart)
 
-    #data = read_data('data/data.json')
-    #table = to_table(data)
-    #save_table_as_csv(table, 'data/data.csv')
-    #save_table_as_parquet(table, 'data/data.parquet')
-    #save_as_pickle(table, 'data/table.pickle')
-    #save_as_pickle(data, 'data/data.pickle')
-    #save_as_compressed(data, 'data/data.gz')
-    #save_table_as_sqlite(table, 'data/data.sqlite')
-    #save_table_as_arrow_table(table, 'data/arrow-table')
-    #save_table_as_arrow_dataset(table, 'data/arrow-dataset')
-
-    #dataset = to_dataset(data)
-    #dataset.to_parquet('data/polars')
+    #ArrowTable.convert(input_file, 'data/arrow-table')
+    read_batch(input_file, 'data/arrow-table', ArrowTable)
