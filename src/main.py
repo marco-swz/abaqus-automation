@@ -90,6 +90,9 @@ def run_sim(settings: SimSettings):
     script = re.sub(r".*session\.openOdb.*", '# DELETED', script)
     script = re.sub(r"session\.odbs.*", '# DELETED', script)
     script = re.sub(r"(?s)mdb\.Job\(.*?\)", '# DELETED', script)
+    
+    material_file = '1_Combined_WBS355MC_211340.csv'
+    script.replace('materal_path', 'materials/'+material_file)
     # Append custom job control
     script += create_job_control(settings)
     write_file(script_path, script)

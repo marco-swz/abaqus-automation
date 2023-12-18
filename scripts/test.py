@@ -9,6 +9,7 @@
 #: Executing "onCaeGraphicsStartup()" in the site directory ...
 from abaqus import *
 from abaqusConstants import *
+import csv
 session.Viewport(name='Viewport: 1', origin=(0.0, 0.0), width=323.996887207031, 
     height=130.76481628418)
 # DELETED
@@ -21,7 +22,7 @@ Mdb()
 #: A new model database has been created.
 #: The model "Model-1" has been created.
 #Blechgroesse
-breite = 15.0
+#breite = 15.0
 hoehe = 2.
 laenge = 150
 #Vernetzung
@@ -33,6 +34,15 @@ material_Name = 'Stahl'
 Dichte = 0.00000000785 #kg/mm^3
 E_Modul = 210000 #MPa
 Poisson = 0.3 
+Plastic = []
+with open (material_path) as f: 
+    reader = csv.reader(f, delimiter=',',quotechar='|')
+    is_header = True
+    for row in reader:
+        if is_header:
+            is_header = False
+            continue
+        Plastic.append([float(r) for r in row])
 
 
 s = mdb.models['Model-1'].ConstrainedSketch(name='__profile__', 
@@ -152,9 +162,7 @@ p.PartitionCellBySweepEdge(sweepPath=e1[15], cells=pickedCells,
 mdb.models['Model-1'].Material(name=material_Name)
 mdb.models['Model-1'].materials[material_Name].Density(table=((Dichte, ), ))
 mdb.models['Model-1'].materials[material_Name].Elastic(table=((E_Modul, Poisson), ))
-mdb.models['Model-1'].materials[material_Name].Plastic(scaleStress=None, table=((
-    305.0, 0.0), (309.0, 0.001125), (320.0, 0.013996), (331.0, 0.118731), (
-    340.0, 0.281615), (350.0, 0.481607), (360.0, 0.78642), (370.0, 1.18941)))
+mdb.models['Model-1'].materials[material_Name].Plastic(scaleStress=None, table=( Plastic))
 mdb.models['Model-1'].HomogeneousSolidSection(name='Material', 
     material=material_Name, thickness=None)
 p = mdb.models['Model-1'].parts['Blech']
@@ -738,6 +746,6 @@ job = mdb.Job(
     numGPUs=0
 )
 
-job.submit(consistencyChecking=OFF)
-job.waitForCompletion()
+#job.submit(consistencyChecking=OFF)
+#job.waitForCompletion()
     

@@ -21,15 +21,32 @@ executeOnCaeStartup()
 Mdb()
 #: A new model database has been created.
 #: The model "Model-1" has been created.
-# DELETED
 #Blechgroesse
-breite = 15.0
-hoehe = 2.
-laenge = 150
+#breite = 15.0
+#hoehe = 2.
+#laenge = 150
 #Vernetzung
-dickenelement = hoehe/2
-biegeelement = 2
-globalelement = 10
+#dickenelement = hoehe/2
+#biegeelement = 2
+#globalelement = 10
+#Material
+#material_Name = 'Stahl'
+#Dichte = 0.00000000785 #kg/mm^3
+#E_Modul = 210000 #MPa
+#Poisson = 0.3 
+#maxWeg = -20.0
+Plastic = []
+with open (material_path) as f: 
+    reader = csv.reader(f, delimiter=',',quotechar='|')
+    is_header = True
+    for row in reader:
+        if is_header:
+            is_header = False
+            continue
+        Plastic.append([float(r) for r in row])
+
+
+        
 s = mdb.models['Model-1'].ConstrainedSketch(name='__profile__', 
     sheetSize=200.0)
 g, v, d, c = s.geometry, s.vertices, s.dimensions, s.constraints
@@ -144,14 +161,12 @@ p.PartitionCellBySweepEdge(sweepPath=e1[15], cells=pickedCells,
 # DELETED
 # DELETED
 #Material festlegen
-mdb.models['Model-1'].Material(name='Aluminium')
-mdb.models['Model-1'].materials['Aluminium'].Density(table=((2.66e-09, ), ))
-mdb.models['Model-1'].materials['Aluminium'].Elastic(table=((70000.0, 0.3), ))
-mdb.models['Model-1'].materials['Aluminium'].Plastic(scaleStress=None, table=((
-    305.0, 0.0), (309.0, 0.001125), (320.0, 0.013996), (331.0, 0.118731), (
-    340.0, 0.281615), (350.0, 0.481607), (360.0, 0.78642), (370.0, 1.18941)))
+mdb.models['Model-1'].Material(name=material_Name)
+mdb.models['Model-1'].materials[material_Name].Density(table=((Dichte, ), ))
+mdb.models['Model-1'].materials[material_Name].Elastic(table=((E_Modul, Poisson), ))
+mdb.models['Model-1'].materials[material_Name].Plastic(scaleStress=None, table=( Plastic))
 mdb.models['Model-1'].HomogeneousSolidSection(name='Material', 
-    material='Aluminium', thickness=None)
+    material=material_Name, thickness=None)
 p = mdb.models['Model-1'].parts['Blech']
 c = p.cells
 cells = c.getSequenceFromMask(mask=('[#fff ]', ), )
@@ -221,9 +236,11 @@ mdb.models['Model-1'].StaticStep(name='Ausgansposition', previous='Halten',
     maxNumInc=100000, initialInc=0.05, minInc=1e-15)
 # DELETED
 regionDef=mdb.models['Model-1'].rootAssembly.sets['Auswertung']
-mdb.models['Model-1'].historyOutputRequests['H-Output-1'].setValues(variables=(
-    'COOR1', 'COOR2', 'COOR3'), region=regionDef, sectionPoints=DEFAULT, 
-    rebar=EXCLUDE)
+#mdb.models['Model-1'].historyOutputRequests['H-Output-1'].setValues(variables=(
+#    'COOR1', 'COOR2', 'COOR3'), region=regionDef, sectionPoints=DEFAULT, 
+#    rebar=EXCLUDE)
+mdb.models['Model-1'].FieldOutputRequest(name='Auswerte_Variable', 
+        createStepName='Verformen', variables=('S', 'RF', 'COORD'))
 # DELETED
 mdb.models['Model-1'].ContactProperty('Reibung')
 mdb.models['Model-1'].interactionProperties['Reibung'].TangentialBehavior(
@@ -331,7 +348,7 @@ mdb.models['Model-1'].DisplacementBC(name='Stempel', createStepName='Initial',
 mdb.models['Model-1'].boundaryConditions['Stempel'].setValuesInStep(
     stepName='Verformen', u2=1.0, amplitude='StempelWeg')
 mdb.models['Model-1'].amplitudes['StempelWeg'].setValues(timeSpan=TOTAL, 
-    smooth=SOLVER_DEFAULT, data=((0.0, 0.0), (1.0, -20.0), (2.0, -20.0), (3.0, 
+    smooth=SOLVER_DEFAULT, data=((0.0, 0.0), (1.0, maxWeg), (2.0, maxWeg), (3.0, 
     0.0)))
 #Eigengewicht
 #mdb.models['Model-1'].Gravity(comp2=-9810.0, createStepName='Verformen', 
