@@ -92,21 +92,21 @@ def run_sim(settings: SimSettings):
     script = re.sub(r"(?s)mdb\.Job\(.*?\)", '# DELETED', script)
     
     material_file = '1_Combined_WBS355MC_211340.csv'
-    script.replace('material_path', 'materials/'+material_file)
-    #sheetsize
-    script.replace('breite', 15.0)
-    script.replace('hoehe', 2.0)
-    script.replace('laenge', 150.0)
-    #mesh
-    script.replace('dickenelement', 2.0/2)
-    script.replace('biegeelement', 2)
-    script.replace('globalelement', 10)
-    #Material
-    script.replace('material_Name', 'Stahl')
-    script.replace('Dichte', 0.00000000785)
-    script.replace('E_Modul', 210000)
-    script.replace('Poisson', 0.3)
-    script.replace('maxWeg', -20.0)
+    script = script.replace('material_path', 'materials/'+material_file)
+    # Sheetsize
+    script = script.replace('breite', '15.0')
+    script = script.replace('hoehe', '2.0')
+    script = script.replace('laenge', '150.0')
+    # Mesh
+    script = script.replace('dickenelement', str(2.0/2))
+    script = script.replace('biegeelement', '2')
+    script = script.replace('globalelement', '10')
+    # Material
+    script = script.replace('material_Name', 'Stahl')
+    script = script.replace('Dichte', '0.00000000785')
+    script = script.replace('E_Modul', '210000')
+    script = script.replace('Poisson', '0.3')
+    script = script.replace('maxWeg', '-20.0')
 
     # Append custom job control
     script += create_job_control(settings)
