@@ -76,3 +76,5 @@ session.viewports['Viewport: 1'].setValues(displayedObject=None)
 #: Starting simulation
 session.viewports['Viewport: 1'].partDisplay.setValues(sectionAssignments=ON, 
     engineeringFeatures=ON)
+del session.viewports['Viewport: 1']
+#* CanvasError: SystemError: the current viewport may not be deleted.
