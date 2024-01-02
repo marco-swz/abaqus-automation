@@ -4,29 +4,50 @@ The goal of this project is to automate the creation and execution of Abaqus sim
 
 # Usage
 
+## Prerequisites
+
+The following prerequisites need to be met to use this project:
+- Abaqus installed and licensed
+- Python 3.10 installed with the packages:
+    - numpy
+    - polars
+    - pyarrow
+    - matplotlib
+
+## Job Execution
+
+1. Place a [template](#templates) of the job script inside the `template` directory
+2. Change the placeholders and replacement values inside `src/main.py`
+3. Run the python script with `python src/main.py` 
+
+## Data Extraction
+
+1. Change the file path of the `.odb` file inside `src/data_extraction.py`
+2. Modify the extraction data inside `src/data_extraction.py`
+3. Run the python script with `python src/data_extraction.py`
+
+# Background
+
 ## Templates
 
-The automation script allows modifying Abaqus job scripts before execution in an programmatic manner.
+The automation script allows modifying Abaqus job scripts before execution in a programmatic manner.
 
 The job scripts are placed in the `template` directory of this project.
-The template is read by the automation script before the simulation is started and all placeholder are replaced by predefined values.
+The template is read by the automation script before the simulation is started and all placeholders are replaced by predefined values.
 The placeholders and replacement values are defined in the file `src/main.py`, where they can be easily changed.
 For examples, it is possible to automaticlly insert custom material parameters or add random variance to the model.
 
 ```python
 # Using material parameters defined in a seperate file
 def run_sim(settings: SimSettings):
-    ...
     script = read_file(template_path)
-    ...
     material_file = 'my_material.csv'
     script = script.replace('material_path', 'materials/'+material_file)
-    ...
     write_file(script_path, script)
 ```
 
-Additionally, the automation script removes all previous job submission commands from the template and inserts a new commit command at the end.
-The parameters for the job sumbission are also defined in the file `src/main.py`, where they can be changed.
+Additionally, the automation script removes all previous job submission commands from the template and inserts a new submission command at the end.
+The parameters for the job submission are also defined in the file `src/main.py`, where they can be changed.
 
 ```python
 def main() -> None:
@@ -46,14 +67,74 @@ After all replacements are done, the final job script is saved to the directory 
 
 ## Data Extraction
 
-Abaqus stores the simulation in `.odb` files.
-Since they require a Abaqus license to open, we provide a script to extract data to a `.json` file.
+Abaqus stores the simulation data in `.odb` files.
+Since they require an Abaqus license to open, we provide a script to extract data to a `.json` file.
+The JSON file perserves the nested structure of the `odb` file.
 
-To execute to data extraction, run `python src/data_extraction.py` in the terminal.
+Not everything gets extracted by the script.
+The extraction data is defined in the file `src/data_extraction.py` and can be changed to fit specific requirements.
 
-## Data Conversion
+# Storage Format Benchmarks
 
 When storing large amount of data from multiple simulations, the JSON format is a bad choice, not only with respect to storage size, but also reading times.
+We performed a series of experiments to determine a better storage format.
 
-TODO(marco) Continue
+We compared the following formats:
+- Sqlite
+- CSV
+- Parquet
+- Apache Arrow
 
+Additionally, each format is tested with two storage architectures:
+- Single: The whole data is stored in a single table. This is simple, but also contains lots of duplicated information.
+
+    | step_name | frame_num | type_name | val1 | val2 | val3 | val4 | val5 | val6 |
+    | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+    | "Down" | 0 | "Stress" | 10 | 5 | 3 | 4 | 1 | 0 |
+    | "Down" | 0 | "Force" | 10 | null | null | null | null | null |
+    | "Down" | 1 | "Stress" | 13 | 4 | 5 | 5 | 0 | 1 |
+    | "Down" | 1 | "Force" | 15 | null | null | null | null | null |
+    | "Up" | 0 | "Stress" | 9 | 3 | 2 | 3 | 0 | 0 |
+    | "Up" | 0 | "Force" | 3 | null | null | null | null | null |
+    | "Up" | 1 | "Stress" | 4 | 0 | 1 | 3 | 9 | 0 |
+    | "Up" | 1 | "Force" | 1 | null | null | null | null | null |
+
+- Multiple: The data normalized and split into multiple tables. This eliminates duplicate information, but makes working with the data more complex.
+
+    | step_id | step_name |
+    | --- | --- |
+    | 0 | "Down" |
+    | 1 | "Up" |
+
+    | type_id | type_name |
+    | --- | --- |
+    | 0 | "Stress" |
+    | 1 | "Force" |
+
+    | frame_id | step_id | frame_num |
+    | --- | --- | --- |
+    | 0 | 0 | 0 |
+    | 1 | 0 | 1 |
+    | 2 | 1 | 0 |
+    | 3 | 1 | 1 |
+
+    | node_id | frame_id | type_id | val1 | val2 | val3 | val4 | val5 | val6 |
+    | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+     | 0 | 0 | 0 | 10 | 5 | 3 | 4 | 1 | 0 |
+    | 1 | 0 | 1 | 10 | null | null | null | null | null |
+    | 2 | 1 | 0 | 13 | 4 | 5 | 5 | 0 | 1 |
+    | 3 | 1 | 1 | 15 | null | null | null | null | null |
+    | 4 | 2 | 0 | 9 | 3 | 2 | 3 | 0 | 0 |
+    | 5 | 2 | 1 | 3 | null | null | null | null | null |
+    | 6 | 3 | 0 | 4 | 0 | 1 | 3 | 9 | 0 |
+    | 7 | 3 | 1 | 1 | null | null | null | null | null |
+
+## Storage Size
+
+![Storage Sizes](storage_sizes.png)
+
+## Reading Times
+
+![Reading Times](read_time.png)
+
+![Reading Times Detailed](read_time_detailed.png)
