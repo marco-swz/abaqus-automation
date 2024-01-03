@@ -77,15 +77,15 @@ The extraction data is defined in the file `src/data_extraction.py` and can be c
 # Storage Format Benchmarks
 
 When storing large amount of data from multiple simulations, the JSON format is a bad choice, not only with respect to storage size, but also reading times.
-We performed a series of experiments to determine a better storage format.
+We performed a series of experiments to determine a better storage format for FEM data.
 
-We compared the following formats:
+We compared the following file-based formats:
 - Sqlite
 - CSV
 - Parquet
 - Apache Arrow
 
-Additionally, each format is tested with two storage architectures:
+Additionally, we tested three different storage layouts:
 - Single: The whole data is stored in a single table. This is simple, but also contains lots of duplicated information.
 
     | step_name | frame_num | type_name | val1 | val2 | val3 | val4 | val5 | val6 |
@@ -120,7 +120,7 @@ Additionally, each format is tested with two storage architectures:
 
     | node_id | frame_id | type_id | val1 | val2 | val3 | val4 | val5 | val6 |
     | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-     | 0 | 0 | 0 | 10 | 5 | 3 | 4 | 1 | 0 |
+    | 0 | 0 | 0 | 10 | 5 | 3 | 4 | 1 | 0 |
     | 1 | 0 | 1 | 10 | null | null | null | null | null |
     | 2 | 1 | 0 | 13 | 4 | 5 | 5 | 0 | 1 |
     | 3 | 1 | 1 | 15 | null | null | null | null | null |
@@ -129,12 +129,32 @@ Additionally, each format is tested with two storage architectures:
     | 6 | 3 | 0 | 4 | 0 | 1 | 3 | 9 | 0 |
     | 7 | 3 | 1 | 1 | null | null | null | null | null |
 
+- Partitioned: Apache Arrow provides the option, apply a specific paritioning scheme for data storage. For the benchmarks, the partiioning columns `step_name` and `type_name` is selected.
+
 ## Storage Size
+
+The following figure shows the storage size for the same simulation data in different storage formats.
 
 ![Storage Sizes](storage_sizes.png)
 
+On the lower end, we can see, that Apache Arrow slightly outperforms the Parquet data format.
+In both cases, only using single table beats the approach of splitting up the data.
+For this example this makes sense, since storing all the relationships between tables requires more information than simply duplicating the data.
+
 ## Reading Times
+
+The benchmarks measuring the reading times are specifically designed with machine learning in mind.
+What gets evaluated is the access of all nodes for random simulation frame, but only for a specific value type and simulation step.
+This emulates the process repeatedly selecting random training data for machine learning purposes.
+
+The following two figures show the results of the data reading benchmark.
+The first image compares all methods, while the second focuses only on the better performing storage formats.
 
 ![Reading Times](read_time.png)
 
 ![Reading Times Detailed](read_time_detailed.png)
+
+Also for this experiment, a single Apache Arrow table comes out on top.
+In this benchmark, using multiple tables shows some advantages over a single table.
+
+We conclude, that using Apache Arrow with a single table is the best storage format for our application.
