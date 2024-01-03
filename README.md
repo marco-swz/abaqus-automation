@@ -28,6 +28,22 @@ The following prerequisites need to be met to use this project:
 
 # Background
 
+## Rationale
+
+This repository was created with machine learning in mind.
+To generate a large amount of training data, many FEM simulations need to be executed and the data stored in an appropriate format.
+Additionally, some simulation parameters may need to be varied to generate an exhaustive training dataset.
+
+## Example FEM Simulation
+
+For our testing, we used the following FEM simulation:
+
+![gif](3Point-Bending_mises.gif)
+
+A metal sheet is bent at center with a support contact on each side.
+The model creation and setup is defined in the file `templates/test.py`.
+This serves as basis for the simulation and consequent data collection.
+
 ## Templates
 
 The automation script allows modifying Abaqus job scripts before execution in a programmatic manner.
