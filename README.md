@@ -16,7 +16,7 @@ The following prerequisites need to be met to use this project:
 
 ## Job Execution
 
-1. Place a [template](#templates) of the job script inside the `template` directory
+1. Place a [template](#templates) of your Abaqus job script inside the `template` directory. The template can contain placeholders, which are later replaced.
 2. Change the placeholders and replacement values inside `src/main.py`
 3. Run the python script with `python src/main.py` 
 
@@ -26,6 +26,10 @@ The following prerequisites need to be met to use this project:
 2. Modify the extraction data inside `src/data_extraction.py`
 3. Run the python script with `python src/data_extraction.py`
 
+## Performance Benchmark
+
+1. Execute the benchmark with `python src/data_conversion.py`
+
 # Background
 
 ## Rationale
@@ -34,15 +38,17 @@ This repository was created with machine learning in mind.
 To generate a large amount of training data, many FEM simulations need to be executed and the data stored in an appropriate format.
 Additionally, some simulation parameters may need to be varied to generate an exhaustive training dataset.
 
+This repository contains scripts to automate these steps.
+
 ## Example FEM Simulation
 
 For our testing, we used the following FEM simulation:
 
 ![gif](3Point-Bending_mises.gif)
 
-A metal sheet is bent at center with a support contact on each side.
+A metal sheet is bent in the middle, with a support contacts on each side.
 The model creation and setup is defined in the file `templates/test.py`.
-This serves as basis for the simulation and consequent data collection.
+This file serves as basis for the simulation and consequent data collection.
 
 ## Templates
 
@@ -84,11 +90,11 @@ After all replacements are done, the final job script is saved to the directory 
 ## Data Extraction
 
 Abaqus stores the simulation data in `.odb` files.
-Since they require an Abaqus license to open, we provide a script to extract data to a `.json` file.
-The JSON file perserves the nested structure of the `odb` file.
+Since they require an Abaqus license to open, we provide a script to extract data to the JSON format.
+The created `.json` file perserves the nested structure of the original `odb` file.
 
 Not everything gets extracted by the script.
-The extraction data is defined in the file `src/data_extraction.py` and can be changed to fit specific requirements.
+The extraction data is defined in `src/data_extraction.py` and can be changed to fit specific requirements.
 
 # Storage Format Benchmarks
 
@@ -102,7 +108,7 @@ We compared the following file-based formats:
 - Apache Arrow
 
 Additionally, we tested three different storage layouts:
-- Single: The whole data is stored in a single table. This is simple, but also contains lots of duplicated information.
+- **Single Table**: The whole data is stored in a single table. This is simple, but also contains lots of duplicated information.
 
     | step_name | frame_num | type_name | val1 | val2 | val3 | val4 | val5 | val6 |
     | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -115,7 +121,7 @@ Additionally, we tested three different storage layouts:
     | "Up" | 1 | "Stress" | 4 | 0 | 1 | 3 | 9 | 0 |
     | "Up" | 1 | "Force" | 1 | null | null | null | null | null |
 
-- Multiple: The data normalized and split into multiple tables. This eliminates duplicate information, but makes working with the data more complex.
+- **Multiple Tables**: The data normalized and split into multiple tables. This eliminates duplicate information, but makes working with the data more complex.
 
     | step_id | step_name |
     | --- | --- |
@@ -145,7 +151,7 @@ Additionally, we tested three different storage layouts:
     | 6 | 3 | 0 | 4 | 0 | 1 | 3 | 9 | 0 |
     | 7 | 3 | 1 | 1 | null | null | null | null | null |
 
-- Partitioned: Apache Arrow provides the option, apply a specific paritioning scheme for data storage. For the benchmarks, the partiioning columns `step_name` and `type_name` is selected.
+- **Partitioned Dataset**: Apache Arrow provides the option to apply a specific paritioning scheme to the data storage. For the benchmarks, the partitioning columns `step_name` and `type_name` are selected.
 
 ## Storage Size
 
@@ -160,17 +166,18 @@ For this example this makes sense, since storing all the relationships between t
 ## Reading Times
 
 The benchmarks measuring the reading times are specifically designed with machine learning in mind.
-What gets evaluated is the access of all nodes for random simulation frame, but only for a specific value type and simulation step.
+What gets measured is the access time of all nodes for a random simulation frame, but only for a specific value type and simulation step.
 This emulates the process repeatedly selecting random training data for machine learning purposes.
 
 The following two figures show the results of the data reading benchmark.
-The first image compares all methods, while the second focuses only on the better performing storage formats.
+The first image compares all methods, while the second focuses only on the better performing ones.
 
 ![Reading Times](read_time.png)
 
 ![Reading Times Detailed](read_time_detailed.png)
 
 Also for this experiment, a single Apache Arrow table comes out on top.
-In this benchmark, using multiple tables shows some advantages over a single table.
+For the other formats, this benchmark shows some advantages using multiple tables over a single one.
 
 We conclude, that using Apache Arrow with a single table is the best storage format for our application.
+If more columns need to be stored than in this experiment, using multiple tables might start showing some advantages.
