@@ -44,7 +44,7 @@ This repository contains scripts to automate these steps.
 
 For our testing, we used the following FEM simulation:
 
-[![3-Point Bending](https://imgur.com/embed/abc123)](https://imgur.com/a/reVPqs1)
+[![3-Point Bending](<blockquote class="imgur-embed-pub" lang="en" data-id="a/reVPqs1"  ><a href="//imgur.com/a/reVPqs1">3pointbending_Mises</a></blockquote><script async src="//s.imgur.com/min/embed.js" charset="utf-8"></script>)](https://imgur.com/a/reVPqs1)
 
 A metal sheet is bent in the middle, with a support contacts on each side.
 The model creation and setup is defined in the file `templates/test.py`.
