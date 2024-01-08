@@ -44,7 +44,7 @@ This repository contains scripts to automate these steps.
 
 For our testing, we used the following FEM simulation:
 
-[![3-Point Bending](https://imgur.com/embed/reVPqs1)](https://imgur.com/a/reVPqs1)
+![Bending Deformation](https://github.com/xRetry/abaqus-automation/raw/main/Bending_deformation.gif)
 
 A metal sheet is bent in the middle, with a support contacts on each side.
 The model creation and setup is defined in the file `templates/test.py`.
