@@ -44,6 +44,8 @@ This repository contains scripts to automate these steps.
 
 For our testing, we used the following FEM simulation:
 
+<img src="Simulation_Start.JPG" width="600">
+
 ![Bending Deformation](https://github.com/xRetry/abaqus-automation/raw/main/Bending_deformation.gif)
 
 A metal sheet is bent in the middle, with a support contacts on each side.
