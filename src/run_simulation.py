@@ -41,6 +41,7 @@ def replace_all(text: str, replace: Dict[str, str|Callable[[], str]]) -> str:
     return text
 
 def create_job_control(settings: SimSettings) -> str:
+    """Converts simulation settings to an Abaqus job command."""
     return f"""
 job = mdb.Job(
     name='{settings.job_name}', 
@@ -75,6 +76,7 @@ job.waitForCompletion()
     """
 
 def run_sim(settings: SimSettings):
+    """Replaces all placeholders and runs the Abaqus simulation."""
     template_path = f'templates/{settings.job_name}.py'
     script_path = f'scripts/{settings.job_name}.py'
      

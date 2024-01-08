@@ -21,17 +21,20 @@ class Dataset:
     nodes: ...
 
 def read_json(path: str) -> dict:
+    """Reads a json file at given path."""
     file = open(path)
     data = json.load(file)
     file.close()
     return data
 
 def write_json(obj: dict, path: str):
+    """Writes a dict to a json file."""
     file = open(path, 'w')
     json.dump(obj, file)
     file.close()
 
 def to_table(data: dict) -> pl.DataFrame:
+    """Converts a data dictionary to a DataFrame table."""
     table = [];
     for step_name, step in data.items():
         for frame_num, frame in step.items():
@@ -55,6 +58,7 @@ def to_table(data: dict) -> pl.DataFrame:
     return pl.DataFrame(table, col_names)
 
 def to_dataset(data) -> Dataset:
+    """Converts a data dict to a dataset, contains multiple tables."""
     table_steps = []
     table_nodes = []
     table_frames = []
@@ -424,6 +428,7 @@ class ArrowTablePart:
         samples = pl.from_arrow(samples.to_table())
 
 def read_batch(input_file:str, path: str, storage):
+    """Tests the reading times of a specific storage format."""
     data = read_json(input_file)
     dataset = to_dataset(data)
     num_reads = 10

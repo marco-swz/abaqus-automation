@@ -4,6 +4,7 @@ import polars as pl
 import numpy as np
 
 def plot_sizes():
+    """Creates a plot for the storage sizes."""
     data = pl.DataFrame(dict(
         name = [
             'CSV single', 
@@ -34,6 +35,7 @@ def plot_sizes():
     plt.show()
 
 def plot_times():
+    """Creates a plot for the reading times."""
     data = []
     for path in os.listdir('benchmarks'):
         data.append(pl.read_json('benchmarks/'+path))
