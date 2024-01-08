@@ -5,12 +5,12 @@ import json
             
 odb = openOdb('data.odb')
 
-def get_frames(odb):
+def store_as_json(odb):
     stepMap = {}
     for step_name in odb.steps.keys():
         frames = odb.steps[step_name].frames
 
-        frameMap = {}
+        frame_map = {}
         for i, frame in enumerate(frames):
             print(' '*100, end='\r')
             print('Processing step `{}` {}/{} ... '.format(step_name, i+1, len(frames)), end='\r')
@@ -32,8 +32,8 @@ def get_frames(odb):
                     values.append(data)
 
                 field[field_output_key] = values
-            frameMap[i] = field
-        stepMap[step_name] = frameMap
+            frame_map[i] = field
+        step_map[step_name] = frame_map
 
         print('Processing step `{}` {}/{} ... done'.format(step_name, len(frames), len(frames)), end='\r')
         print('')
@@ -45,5 +45,5 @@ def get_frames(odb):
             
     print('done')
 
-get_frames(odb)
+store_as_json(odb)
 
