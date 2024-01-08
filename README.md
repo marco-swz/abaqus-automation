@@ -17,8 +17,8 @@ The following prerequisites need to be met to use this project:
 ## Job Execution
 
 1. Place a [template](#templates) of your Abaqus job script inside the `template` directory. The template can contain placeholders, which are later replaced.
-2. Change the placeholders and replacement values inside `src/main.py`
-3. Run the python script with `python src/main.py` 
+2. Change the placeholders and replacement values inside `src/run_simulation.py`
+3. Run the python script with `python src/run_simulation.py` 
 
 ## Data Extraction
 
@@ -28,7 +28,7 @@ The following prerequisites need to be met to use this project:
 
 ## Performance Benchmark
 
-1. Execute the benchmark with `python src/data_conversion.py`
+1. Execute the benchmark with `python src/storage_benchmarks.py`
 
 # Background
 
@@ -58,7 +58,7 @@ The automation script allows modifying Abaqus job scripts before execution in a 
 
 The job scripts are placed in the `template` directory of this project.
 The template is read by the automation script before the simulation is started and all placeholders are replaced by predefined values.
-The placeholders and replacement values are defined in the file `src/main.py`, where they can be easily changed.
+The placeholders and replacement values are defined in the file `src/run_simulation.py`, where they can be easily changed.
 For examples, it is possible to automaticlly insert custom material parameters or add random variance to the model.
 
 ```python
@@ -71,7 +71,7 @@ def run_sim(settings: SimSettings):
 ```
 
 Additionally, the automation script removes all previous job submission commands from the template and inserts a new submission command at the end.
-The parameters for the job submission are also defined in the file `src/main.py`, where they can be changed.
+The parameters for the job submission are also defined in the file `src/run_simulation.py`, where they can be changed.
 
 ```python
 def main() -> None:

@@ -73,11 +73,8 @@ job = mdb.Job(
 job.submit(consistencyChecking=OFF)
 job.waitForCompletion()
     """
-    # TODO(marco): Add result conversion
 
 def run_sim(settings: SimSettings):
-    # TODO(marco): Set correct file paths in script
-
     template_path = f'templates/{settings.job_name}.py'
     script_path = f'scripts/{settings.job_name}.py'
      
