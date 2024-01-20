@@ -53,6 +53,7 @@
                 matplotlib
                 polars
                 pyarrow
+                ezdxf
             ]))
             nodePackages.pyright
           ]);
